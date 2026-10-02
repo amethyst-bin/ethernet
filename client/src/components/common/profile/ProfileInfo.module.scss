@@ -1,7 +1,7 @@
 @use "../../../styles/mixins";
 
 .root {
-  --profile-info-bg: var(--color-background-secondary);
+  --profile-info-bg: var(--color-background);
   --rating-outline-color: #000000;
   --rating-text-color: #000000;
 
@@ -402,7 +402,31 @@
   pointer-events: none;
   position: absolute;
   inset: 0;
-  aspect-ratio: 1 / 1;
+  width: 100%;
+  height: 100%;
+
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent 0%,
+    rgba(0, 0, 0, 0.2) 1rem,
+    rgba(0, 0, 0, 0.7) 2.25rem,
+    black 3.5rem,
+    black calc(100% - 3.5rem),
+    rgba(0, 0, 0, 0.7) calc(100% - 2.25rem),
+    rgba(0, 0, 0, 0.2) calc(100% - 1rem),
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    transparent 0%,
+    rgba(0, 0, 0, 0.2) 1rem,
+    rgba(0, 0, 0, 0.7) 2.25rem,
+    black 3.5rem,
+    black calc(100% - 3.5rem),
+    rgba(0, 0, 0, 0.7) calc(100% - 2.25rem),
+    rgba(0, 0, 0, 0.2) calc(100% - 1rem),
+    transparent 100%
+  );
 }
 
 .standaloneAvatar {
@@ -427,6 +451,35 @@
     align-self: center;
   }
 
+  .radialPatternBackground {
+    aspect-ratio: unset;
+    width: 100%;
+    height: 100%;
+
+    -webkit-mask-image: linear-gradient(
+      to bottom,
+      transparent 0%,
+      rgba(0, 0, 0, 0.2) 1rem,
+      rgba(0, 0, 0, 0.7) 2.25rem,
+      black 3.5rem,
+      black calc(100% - 4.5rem),
+      rgba(0, 0, 0, 0.7) calc(100% - 3rem),
+      rgba(0, 0, 0, 0.2) calc(100% - 1.5rem),
+      transparent 100%
+    );
+    mask-image: linear-gradient(
+      to bottom,
+      transparent 0%,
+      rgba(0, 0, 0, 0.2) 1rem,
+      rgba(0, 0, 0, 0.7) 2.25rem,
+      black 3.5rem,
+      black calc(100% - 4.5rem),
+      rgba(0, 0, 0, 0.7) calc(100% - 3rem),
+      rgba(0, 0, 0, 0.2) calc(100% - 1.5rem),
+      transparent 100%
+    );
+  }
+
   .info {
     position: relative;
 
@@ -447,6 +500,18 @@
   @include mixins.with-vt-type('profileAvatar');
 
   max-width: 100%;
+  font-weight: 700 !important;
+
+  &,
+  & *,
+  :global(.fullName),
+  :global(.fullName) * {
+    font-weight: 700 !important;
+  }
+
+  :global(.fullName) {
+    font-size: 1.35rem !important;
+  }
 }
 
 .pinnedGifts {

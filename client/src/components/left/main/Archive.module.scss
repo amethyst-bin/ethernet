@@ -86,7 +86,7 @@
 .avatarWrapper {
   z-index: 1;
   flex-shrink: 0;
-  background-color: var(--background-color);
+  background-color: transparent !important;
 }
 
 .avatar {

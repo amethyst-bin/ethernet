@@ -1,3 +1,4 @@
+import { DEBUG } from '../config';
 import generateUniqueId from './generateUniqueId';
 import { throttleWithTickEnd } from './schedulers';
 
@@ -196,7 +197,7 @@ class ConnectorClass<T extends InputRequestTypes> {
         const requestState = requestStates.get(payload.messageId);
         if (requestState) {
           if (payload.error) {
-            requestState.reject(new Error(payload.error.message));
+            requestState.reject(new Error(payload.error?.message || 'Worker method error'));
           } else {
             requestState.resolve(payload.response);
           }
@@ -205,7 +206,11 @@ class ConnectorClass<T extends InputRequestTypes> {
         const requestState = requestStates.get(payload.messageId);
         requestState?.callback?.(...payload.callbackArgs);
       } else if (payload.type === 'unhandledError') {
-        throw new Error(payload.error?.message);
+        const message = payload.error?.message || 'Unhandled worker error';
+        if (DEBUG) {
+          // eslint-disable-next-line no-console
+          console.warn('[Worker unhandled error]:', message);
+        }
       }
     });
   }

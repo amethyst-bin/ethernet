@@ -649,7 +649,7 @@ class TelegramClient {
       } catch (err: any) {
         if (this._shouldDebugExportedSenders) {
           // eslint-disable-next-line no-console
-          console.error(`☠️ ERROR! idx=${index} dcId=${dcId} ${err.message}`);
+          console.error(`☠️ ERROR! idx=${index} dcId=${dcId} ${err?.message || err}`);
         }
         // eslint-disable-next-line no-console
         console.error(err);

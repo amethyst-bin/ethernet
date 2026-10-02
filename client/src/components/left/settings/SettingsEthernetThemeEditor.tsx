@@ -14,6 +14,7 @@ import Checkbox from '../../ui/Checkbox';
 import Icon from '../../common/icons/Icon';
 import RangeSlider from '../../ui/RangeSlider';
 import { modToCss, cssToMod } from '../../../util/ethernetThemeUtils';
+import ThemeCssEditorModal from './ThemeCssEditorModal';
 
 import './SettingsEthernetThemeEditor.scss';
 
@@ -32,6 +33,7 @@ const COLOR_VARS: { key: string; langKey: string }[] = [
   { key: '--color-links', langKey: 'EthernetColorLinks' },
   { key: '--color-text-secondary', langKey: 'EthernetColorTextSecondary' },
   { key: '--color-primary', langKey: 'EthernetColorPrimary' },
+  { key: '--color-icon-buttons', langKey: 'EthernetColorIconButtons' },
   { key: '--color-text-meta-colored', langKey: 'EthernetColorTextMetaColored' },
   { key: '--color-background-own', langKey: 'EthernetColorBackgroundOwn' },
   { key: '--color-chat-active', langKey: 'EthernetColorChatActive' },
@@ -57,6 +59,7 @@ export const ETH_DEFAULT_COLORS: Record<string, string> = {
   '--color-links': '#58a6ff',
   '--color-text-secondary': '#9da7b7',
   '--color-primary': '#3b82f6',
+  '--color-icon-buttons': '#9da7b7',
   '--color-text-meta-colored': '#58a6ff',
   '--color-background-own': '#1e3a5f',
   '--color-chat-active': '#2b3d58',
@@ -354,14 +357,13 @@ const CustomColorPicker: FC<{
   );
 };
 
-// Строка цвета: свотч + hex-кнопка (раскрывается при наведении) + сброс + дропдаун пикера
+// Строка цвета: свотч + hex-кнопка (раскрывается при наведении) + дропдаун пикера
 const ColorRow: FC<{
   label: string;
   cssKey: string;
   value?: string;
   onChange: (hex: string) => void;
-  onReset: () => void;
-}> = ({ label, cssKey, value, onChange, onReset }) => {
+}> = ({ label, cssKey, value, onChange }) => {
   const lang = useLang();
   const [isPickerOpen, setIsPickerOpen] = useState(false);
   const [isHexOpen, setIsHexOpen] = useState(false);
@@ -423,9 +425,6 @@ const ColorRow: FC<{
             </button>
           )}
         </div>
-
-        {/* Сброс */}
-        <button type="button" className="color-reset" onClick={onReset} title={getEthernetString(lang, 'EthernetResetColor')}>↺</button>
       </div>
       {isPickerOpen && (
         <div className="color-picker-dropdown">
@@ -446,6 +445,7 @@ const SettingsEthernetThemeEditor: FC<OwnProps> = ({ isActive, onReset }) => {
   const [mod, setMod] = useState<EthernetMod>(DEFAULT_MOD);
   const [themeName, setThemeName] = useState<string | null>(null);
   const [wallpaperInfo, setWallpaperInfo] = useState<{ slug: string | null; file: string | null; originalPath?: string }>({ slug: null, file: null });
+  const [isCssEditorOpen, setIsCssEditorOpen] = useState(false);
 
   useHistoryBack({
     isActive,
@@ -493,6 +493,7 @@ const SettingsEthernetThemeEditor: FC<OwnProps> = ({ isActive, onReset }) => {
       chatWidth: saved.chatWidth || themeParsedMod.chatWidth || 'wide',
     };
 
+    document.documentElement.setAttribute('data-chat-width', nextMod.chatWidth || 'wide');
     setMod(nextMod);
 
     fetch('/ethernet/wallpaper.json')
@@ -518,21 +519,84 @@ const SettingsEthernetThemeEditor: FC<OwnProps> = ({ isActive, onReset }) => {
     }
   }, [isActive, loadThemeData]);
 
+function applyLiveRadii(radii: EthernetRadii) {
+  const rUi = radii.ui ?? 16;
+  const rFs = radii.foldersSidebar ?? (rUi + 8);
+  const rMsg = radii.messages ?? 16;
+  const rBtn = radii.buttons ?? 12;
+  const rAv = radii.avatars ?? 50;
+  const s = document.documentElement.style;
+
+  s.setProperty('--border-radius-island', `${(rUi + 8) / 16}rem`, 'important');
+  s.setProperty('--border-radius-modal', `${(rUi + 16) / 16}rem`, 'important');
+  s.setProperty('--border-radius-default', `${rUi / 16}rem`, 'important');
+  s.setProperty('--border-radius-pane', `${(rUi + 8) / 16}rem`, 'important');
+  s.setProperty('--border-radius-ui', `${rUi}px`, 'important');
+
+  s.setProperty('--border-radius-folders-sidebar', `${rFs / 16}rem`, 'important');
+
+  s.setProperty('--border-radius-messages', `${rMsg / 16}rem`, 'important');
+  s.setProperty('--border-radius-messages-small', `${Math.max(2, rMsg - 8) / 16}rem`, 'important');
+
+  s.setProperty('--border-radius-button', `${rBtn / 16}rem`, 'important');
+  s.setProperty('--border-radius-buttons', `${rBtn}px`, 'important');
+  s.setProperty('--border-radius-default-small', `${Math.max(2, rBtn - 4) / 16}rem`, 'important');
+  s.setProperty('--border-radius-default-tiny', `${Math.max(2, rBtn - 8) / 16}rem`, 'important');
+
+  s.setProperty('--avatar-radius', `${rAv}%`, 'important');
+  s.setProperty('--border-radius-avatars', `${rAv}%`, 'important');
+}
+
   // Живое сохранение и применение мода в моменте
-  const update = useLastCallback(async (patch: Partial<EthernetMod>) => {
+  const update = useLastCallback(async (patch: Partial<EthernetMod>, replaceColors = false) => {
     setMod((prev) => {
       const next: EthernetMod = {
         ...prev,
         ...patch,
       };
       if (patch.colors) {
-        next.colors = { ...(prev.colors || {}), ...patch.colors };
+        next.colors = replaceColors ? { ...patch.colors } : { ...(prev.colors || {}), ...patch.colors };
       }
       if (patch.radii) {
         next.radii = { ...(prev.radii || {}), ...patch.radii };
       }
       if (patch.blurTargets) {
         next.blurTargets = { ...(prev.blurTargets || {}), ...patch.blurTargets };
+      }
+      if (patch.chatWidth) {
+        document.documentElement.setAttribute('data-chat-width', patch.chatWidth);
+      }
+
+      if (next.radii) {
+        applyLiveRadii(next.radii);
+      }
+
+      if (patch.colors) {
+        for (const [k, v] of Object.entries(patch.colors)) {
+          if (v) {
+            document.documentElement.style.setProperty(k, v, 'important');
+            if (k === '--color-primary' && /^#[0-9a-fA-F]{6}$/.test(v)) {
+              const r = parseInt(v.slice(1, 3), 16);
+              const g = parseInt(v.slice(3, 5), 16);
+              const b = parseInt(v.slice(5, 7), 16);
+              document.documentElement.style.setProperty('--color-primary-rgb', `${r}, ${g}, ${b}`, 'important');
+              document.documentElement.style.setProperty('--color-primary-shade', `color-mix(in srgb, ${v} 88%, black)`, 'important');
+              document.documentElement.style.setProperty('--color-primary-shade-darker', `color-mix(in srgb, ${v} 80%, black)`, 'important');
+              document.documentElement.style.setProperty('--color-primary-shade-rgb', `${Math.round(r * 0.88)}, ${Math.round(g * 0.88)}, ${Math.round(b * 0.88)}`, 'important');
+              document.documentElement.style.setProperty('--color-primary-tint', `color-mix(in srgb, ${v} 12%, transparent)`, 'important');
+              document.documentElement.style.setProperty('--color-primary-opacity', `color-mix(in srgb, ${v} 15%, transparent)`, 'important');
+              document.documentElement.style.setProperty('--color-primary-opacity-hover', `color-mix(in srgb, ${v} 25%, transparent)`, 'important');
+              document.documentElement.style.setProperty('--color-active', v, 'important');
+              document.documentElement.style.setProperty('--color-active-darker', `color-mix(in srgb, ${v} 80%, black)`, 'important');
+              document.documentElement.style.setProperty('--accent-color', v, 'important');
+              document.documentElement.style.setProperty('--accent-background-color', `color-mix(in srgb, ${v} 15%, transparent)`, 'important');
+              document.documentElement.style.setProperty('--accent-background-active-color', `color-mix(in srgb, ${v} 25%, transparent)`, 'important');
+              document.documentElement.style.setProperty('--color-interactive-active', v, 'important');
+            }
+          } else {
+            document.documentElement.style.removeProperty(k);
+          }
+        }
       }
 
       const desktopApi = window.ethernetDesktop || window.hermesDesktop;
@@ -544,7 +608,7 @@ const SettingsEthernetThemeEditor: FC<OwnProps> = ({ isActive, onReset }) => {
 
       // Если активна именованная сохраненная тема — обновляем ее файл
       if (themeName && themeName !== 'default' && desktopApi) {
-        const css = modToCss(next, themeName);
+        const css = modToCss(next, themeName, next.customCss);
         const wpFile = next.wallpaperFile || wallpaperInfo?.file;
         const wpInfo = (wpFile) ? {
           file: wpFile,
@@ -554,6 +618,15 @@ const SettingsEthernetThemeEditor: FC<OwnProps> = ({ isActive, onReset }) => {
         } : undefined;
         desktopApi.themeSave(themeName, css, wpInfo);
         desktopApi.themeActivate(themeName);
+
+        // Синхронизируем тег ethernet-active-theme-style в DOM немедленно
+        let activeThemeStyleEl = document.getElementById('ethernet-active-theme-style');
+        if (!activeThemeStyleEl) {
+          activeThemeStyleEl = document.createElement('style');
+          activeThemeStyleEl.id = 'ethernet-active-theme-style';
+          document.head.appendChild(activeThemeStyleEl);
+        }
+        activeThemeStyleEl.textContent = css.replace(/(--[\w-]+)\s*:\s*([^;!]+);/g, '$1: $2 !important;');
       }
       return next;
     });
@@ -562,15 +635,18 @@ const SettingsEthernetThemeEditor: FC<OwnProps> = ({ isActive, onReset }) => {
   const updateRadius = useLastCallback((key: keyof EthernetRadii, val: number) => {
     const currentRadii = mod.radii || {
       ui: 16,
+      foldersSidebar: 24,
       messages: 16,
       buttons: 12,
       avatars: 50,
     };
+    const nextRadii = {
+      ...currentRadii,
+      [key]: val,
+    };
+    applyLiveRadii(nextRadii);
     update({
-      radii: {
-        ...currentRadii,
-        [key]: val,
-      },
+      radii: nextRadii,
     });
   });
 
@@ -578,26 +654,31 @@ const SettingsEthernetThemeEditor: FC<OwnProps> = ({ isActive, onReset }) => {
   const handleWallpaperPick = useLastCallback(async () => {
     const desktopApi = window.ethernetDesktop || window.hermesDesktop;
     if (!desktopApi) return;
-    const picked = await desktopApi.pickFile('wallpaper');
-    if (!picked) return;
-    const activeName = themeName || 'Кастомная';
-    const res = await desktopApi.wallpaperSetFile({
-      name: picked.name,
-      base64: picked.content,
-      originalPath: picked.path || picked.name,
-      themeName: activeName,
-    });
-    const filename = res?.file || (typeof res === 'string' ? `${res}.png` : res?.slug ? `${res.slug}.png` : '');
-    const isVideo = filename.endsWith('.mp4') || filename.endsWith('.webm');
-    setWallpaperInfo({
-      slug: res?.slug || (typeof res === 'string' ? res : 'custom'),
-      file: filename,
-      originalPath: res?.originalPath || picked.path || picked.name,
-    });
-    update({ wallpaperFile: filename, wallpaperKind: isVideo ? 'video' : 'image' });
-    const loaderApi = window.ethernet || window.hermes;
-    if (loaderApi?.wallpaperSet) {
-      loaderApi.wallpaperSet(filename, isVideo ? 'video' : 'image');
+    try {
+      const picked = await desktopApi.pickFile('wallpaper');
+      if (!picked) return;
+      const activeName = themeName || 'Кастомная';
+      const res = await desktopApi.wallpaperSetFile({
+        name: picked.name,
+        path: picked.path,
+        originalPath: picked.path || picked.name,
+        base64: picked.content,
+        themeName: activeName,
+      });
+      const filename = res?.file || (typeof res === 'string' ? `${res}.png` : res?.slug ? `${res.slug}.png` : '');
+      const isVideo = filename.endsWith('.mp4') || filename.endsWith('.webm');
+      setWallpaperInfo({
+        slug: res?.slug || (typeof res === 'string' ? res : 'custom'),
+        file: filename,
+        originalPath: res?.originalPath || picked.path || picked.name,
+      });
+      update({ wallpaperFile: filename, wallpaperKind: isVideo ? 'video' : 'image' });
+      const loaderApi = window.ethernet || window.hermes;
+      if (loaderApi?.wallpaperSet) {
+        loaderApi.wallpaperSet(filename, isVideo ? 'video' : 'image');
+      }
+    } catch (err) {
+      console.error('[SettingsEthernetThemeEditor] Wallpaper set error:', err);
     }
   });
 
@@ -618,6 +699,27 @@ const SettingsEthernetThemeEditor: FC<OwnProps> = ({ isActive, onReset }) => {
     update({ blurTargets: { ...mod.blurTargets, [key]: value } });
   });
 
+  const handleOpenCssEditor = useLastCallback(() => {
+    setIsCssEditorOpen(true);
+  });
+
+  const handleSaveCssFromEditor = useLastCallback(async (name: string, newCss: string) => {
+    const api = window.ethernetDesktop || window.hermesDesktop;
+    const loader = window.ethernet || window.hermes;
+    const activeName = (name || themeName || 'Кастомная').trim();
+    if (api) {
+      await api.themeSave(activeName, newCss);
+      await api.themeActivate(activeName);
+    }
+    const parsedMod = cssToMod(newCss);
+    update(parsedMod);
+    if (loader?.applyTheme) {
+      await loader.applyTheme(activeName);
+    }
+    setThemeName(activeName);
+    setIsCssEditorOpen(false);
+  });
+
   const radii = mod.radii || {
     ui: mod.borderRadius ?? 16,
     messages: mod.borderRadius ?? 16,
@@ -627,6 +729,18 @@ const SettingsEthernetThemeEditor: FC<OwnProps> = ({ isActive, onReset }) => {
 
   return (
     <div className="settings-content custom-scroll theme-editor">
+      <div className="theme-editor-top-actions">
+        <Button
+          className="theme-editor-css-btn"
+          color="translucent"
+          size="smaller"
+          onClick={handleOpenCssEditor}
+        >
+          <Icon name="edit" />
+          <span>{getEthernetString(lang, 'EthernetEditCssCode')}</span>
+        </Button>
+      </div>
+
       {/* Секция Основные настройки (по умолчанию открыта) */}
       <Section title={getEthernetString(lang, 'EthernetSectionMain')} defaultOpen>
         <div className="colors-list">
@@ -637,11 +751,6 @@ const SettingsEthernetThemeEditor: FC<OwnProps> = ({ isActive, onReset }) => {
               label={getEthernetString(lang, langKey)}
               value={mod.colors?.[key]}
               onChange={(hex) => update({ colors: { ...mod.colors, [key]: hex } })}
-              onReset={() => {
-                const colors = { ...mod.colors };
-                delete colors[key];
-                update({ colors });
-              }}
             />
           ))}
         </div>
@@ -655,6 +764,13 @@ const SettingsEthernetThemeEditor: FC<OwnProps> = ({ isActive, onReset }) => {
             max={32}
             value={radii.ui ?? 16}
             onChange={(v) => updateRadius('ui', v)}
+          />
+          <RangeSlider
+            label={getEthernetString(lang, 'EthernetRadiusFoldersSidebar')}
+            min={0}
+            max={32}
+            value={radii.foldersSidebar ?? ((radii.ui ?? 16) + 8)}
+            onChange={(v) => updateRadius('foldersSidebar', v)}
           />
           <RangeSlider
             label={getEthernetString(lang, 'EthernetRadiusMessages')}
@@ -831,6 +947,14 @@ const SettingsEthernetThemeEditor: FC<OwnProps> = ({ isActive, onReset }) => {
           </>
         )}
       </Section>
+
+      <ThemeCssEditorModal
+        isOpen={isCssEditorOpen}
+        themeName={themeName || 'Кастомная'}
+        initialCss={modToCss(mod, themeName || 'Кастомная', mod.customCss)}
+        onClose={() => setIsCssEditorOpen(false)}
+        onSave={handleSaveCssFromEditor}
+      />
     </div>
   );
 };

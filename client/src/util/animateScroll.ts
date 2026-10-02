@@ -30,6 +30,8 @@ export type AnimateScrollArgs = {
   forceNormalContainerHeight?: boolean;
   shouldReturnMutationFn?: boolean;
   noHeavyAnimation?: boolean;
+  isScrollToBottom?: boolean;
+  effectiveScrollHeight?: number;
 };
 
 let isAnimating = false;
@@ -84,6 +86,8 @@ function createMutateFunction(args: AnimateScrollArgs) {
     forceDirection,
     forceNormalContainerHeight,
     noHeavyAnimation,
+    isScrollToBottom,
+    effectiveScrollHeight,
   } = args;
 
   let forceDuration = args.forceDuration;
@@ -103,23 +107,29 @@ function createMutateFunction(args: AnimateScrollArgs) {
     ? Number(container.dataset.normalHeight)
     : containerHeight;
 
+  const effectiveHeight = Math.max(effectiveScrollHeight || 0, scrollHeight);
+
   let scrollTo!: number;
-  switch (position) {
-    case 'start':
-      scrollTo = (elementTop - margin) + (IS_ANDROID ? 1 : 0);
-      break;
-    case 'end':
-      scrollTo = (elementTop + elementHeight + margin) - targetContainerHeight;
-      break;
-    // 'nearest' is not supported yet
-    case 'nearest':
-    case 'center':
-    case 'centerOrTop': {
-      const visibleHeight = Math.max(0, targetContainerHeight - topReserve - bottomReserve);
-      scrollTo = elementHeight < visibleHeight
-        ? (elementTop + elementHeight / 2 - topReserve - visibleHeight / 2)
-        : (elementTop - margin);
-      break;
+  if (isScrollToBottom) {
+    scrollTo = effectiveHeight - containerHeight;
+  } else {
+    switch (position) {
+      case 'start':
+        scrollTo = (elementTop - margin) + (IS_ANDROID ? 1 : 0);
+        break;
+      case 'end':
+        scrollTo = (elementTop + elementHeight + margin) - targetContainerHeight;
+        break;
+      // 'nearest' is not supported yet
+      case 'nearest':
+      case 'center':
+      case 'centerOrTop': {
+        const visibleHeight = Math.max(0, targetContainerHeight - topReserve - bottomReserve);
+        scrollTo = elementHeight < visibleHeight
+          ? (elementTop + elementHeight / 2 - topReserve - visibleHeight / 2)
+          : (elementTop - margin);
+        break;
+      }
     }
   }
 
@@ -130,7 +140,7 @@ function createMutateFunction(args: AnimateScrollArgs) {
     const remainingPath = -scrollFrom;
     path = Math.max(path, remainingPath);
   } else if (path > 0) {
-    const remainingPath = scrollHeight - (scrollFrom + targetContainerHeight);
+    const remainingPath = effectiveHeight - (scrollFrom + (isScrollToBottom ? containerHeight : targetContainerHeight));
     path = Math.min(path, remainingPath);
   }
 
@@ -195,7 +205,7 @@ function createMutateFunction(args: AnimateScrollArgs) {
 
       container.scrollTop = newScrollTop;
 
-      isAnimating = t < 1 && newScrollTop !== target;
+      isAnimating = t < 1;
 
       if (!isAnimating) {
         currentArgs = undefined;

@@ -64,6 +64,7 @@
 
     .btnIcon {
       transform: scale(1.1);
+      color: var(--color-icon-buttons, var(--color-primary));
     }
   }
 
@@ -74,7 +75,7 @@
   .btnIcon {
     font-size: 1.25rem;
     line-height: 1;
-    color: var(--color-primary);
+    color: var(--color-icon-buttons, var(--color-primary));
     transition: transform 0.15s ease;
     flex-shrink: 0;
   }

@@ -161,7 +161,7 @@ export async function init(initialArgs: ApiInitialArgs, onConnected?: NoneToVoid
       // eslint-disable-next-line no-console
       console.error(err);
 
-      if (err.message !== 'Disconnect' && err.message !== 'Cannot send requests while disconnected') {
+      if (err?.message !== 'Disconnect' && err?.message !== 'Cannot send requests while disconnected') {
         sendApiUpdate({
           '@type': 'updateConnectionState',
           connectionState: 'connectionStateBroken',
@@ -329,9 +329,9 @@ export async function invokeRequest<T extends GramJs.AnyRequest>(
       console.error(err);
     }
 
-    const message = err instanceof RPCError ? err.errorMessage : err.message;
+    const message = err instanceof RPCError ? err.errorMessage : (err?.message || String(err));
 
-    if (message.includes('FROZEN_METHOD_INVALID')) {
+    if (message?.includes('FROZEN_METHOD_INVALID')) {
       dispatchNotSupportedInFrozenAccountUpdate(err, request);
     }
 

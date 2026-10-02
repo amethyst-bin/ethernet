@@ -178,8 +178,12 @@ export function buildContentClassName(
     classNames.push('has-subheader');
   }
 
-  if (hasThread) {
+  if (hasThread || hasBottomCommentButton) {
     classNames.push('has-replies');
+  }
+
+  if (hasBottomCommentButton) {
+    classNames.push('has-bottom-comment-button');
   }
 
   if (hasReactions) {

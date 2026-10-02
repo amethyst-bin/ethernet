@@ -89,18 +89,93 @@
   box-sizing: border-box;
 }
 
+.editorModalRoot {
+  :global(.modal-dialog) {
+    max-width: 44rem !important;
+    width: 90vw !important;
+    border-radius: 16px !important;
+    background: var(--color-background) !important;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.65) !important;
+    border: none !important;
+    overflow: hidden !important;
+    padding: 0 !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+
+  :global(.modal-header) {
+    padding: 1.25rem 1.25rem 0.625rem 1.25rem !important;
+    margin: 0 !important;
+    background: var(--color-background) !important;
+    border: none !important;
+    display: flex !important;
+    align-items: center !important;
+
+    :global(.modal-title) {
+      margin: 0 !important;
+      padding: 0 !important;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", system-ui, sans-serif !important;
+      font-size: 1.0625rem !important;
+      font-weight: 600 !important;
+      letter-spacing: -0.01em !important;
+      color: var(--color-text) !important;
+    }
+
+    :global(.Button) {
+      border-radius: 50% !important;
+      width: 1.875rem !important;
+      height: 1.875rem !important;
+      border: none !important;
+      background: var(--color-background-secondary) !important;
+      color: var(--color-text) !important;
+      opacity: 0.8;
+      transition: opacity 0.15s ease, background-color 0.15s ease;
+
+      &:hover {
+        opacity: 1;
+      }
+    }
+  }
+
+  :global(.modal-content) {
+    padding: 0 1.25rem 1.25rem 1.25rem !important;
+    background: transparent !important;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+}
+
 .editor {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
+
+  :global(.input-group) {
+    background: var(--color-background-secondary);
+    border-radius: 10px;
+    border: none;
+  }
 }
 
 .codeArea {
   :global(textarea) {
-    font-family: monospace;
+    font-family: ui-monospace, "SF Mono", Menlo, Monaco, Consolas, monospace;
     font-size: 0.8125rem;
     min-height: 18rem;
     resize: vertical;
+    background: var(--color-background-secondary) !important;
+    border-radius: 10px !important;
+    border: none !important;
+    color: var(--color-text) !important;
+    padding: 0.75rem 0.875rem !important;
+    outline: none;
+
+    &:focus {
+      opacity: 0.95;
+    }
   }
 }
 

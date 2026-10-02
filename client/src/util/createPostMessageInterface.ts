@@ -136,7 +136,7 @@ function onMessage(
             sendToOrigin({
               type: 'methodResponse',
               messageId,
-              error: { message: error.message },
+              error: { message: (error as any)?.message || String(error) },
             });
           }
         }
@@ -165,15 +165,22 @@ function isTransferable(obj: any) {
 }
 
 function handleErrors(sendToOrigin: SendToOrigin) {
-  self.onerror = (e) => {
+  self.onerror = (e: ErrorEvent | any) => {
+    const error = e?.error || e;
+    const message = e?.message || e;
     // eslint-disable-next-line no-console
-    console.error(e);
-    sendToOrigin({ type: 'unhandledError', error: { message: e.error.message || 'Uncaught exception in worker' } });
+    console.error(message, error);
+    const errorMessage = error?.message
+      || (typeof message === 'string' ? message : (message as any)?.message)
+      || 'Uncaught exception in worker';
+    sendToOrigin({ type: 'unhandledError', error: { message: errorMessage } });
   };
 
-  self.addEventListener('unhandledrejection', (e) => {
+  self.addEventListener('unhandledrejection', (e: any) => {
     // eslint-disable-next-line no-console
     console.error(e);
-    sendToOrigin({ type: 'unhandledError', error: { message: e.reason.message || 'Uncaught rejection in worker' } });
+    const errorMessage = e?.reason?.message
+      || (typeof e?.reason === 'string' ? e.reason : 'Uncaught rejection in worker');
+    sendToOrigin({ type: 'unhandledError', error: { message: errorMessage } });
   });
 }

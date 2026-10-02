@@ -45,6 +45,7 @@ import {
   selectIsCurrentUserFrozen,
   selectIsCurrentUserPremium,
   selectIsInSelectMode,
+  selectIsMessageSelected,
   selectIsViewportNewest,
   selectMonoforumChannel,
   selectPerformanceSettingsValue,
@@ -82,7 +83,6 @@ import {
   consumePendingTopGrowth,
   getEffectiveMessageListBottomReserve,
   getMessageListTopReserve,
-  isSendCollapsePhaseActive,
   syncMessageListBottomReserve,
 } from './helpers/messageListReserves';
 import { preventMessageInputBlur } from './helpers/preventMessageInputBlur';
@@ -199,7 +199,6 @@ const BOTTOM_SNAP_THRESHOLD = 7;
 const UNREAD_DIVIDER_TOP = 10;
 const SCROLL_DEBOUNCE = 200;
 const MESSAGE_ANIMATION_DURATION = 500;
-const MIN_SEND_COLLAPSE_REVEAL_SHIFT = 1;
 const SEND_FOCUS_DURATION = SCROLL_MAX_DURATION + ANIMATION_END_DELAY;
 const BOTTOM_FOCUS_MARGIN = 0.5 * REM;
 const FEW_MESSAGES_SCROLL_RISE = 4 * REM;
@@ -709,6 +708,10 @@ const MessageList = ({
       return;
     }
 
+    if (container.parentElement) {
+      scrollOffsetRef.current = container.scrollHeight - container.scrollTop;
+    }
+
     if (!memoFocusingIdRef.current) {
       updateStickyDates(container);
     }
@@ -780,8 +783,9 @@ const MessageList = ({
     }
 
     const { scrollTop, scrollHeight, offsetHeight } = container;
-    const wasAtBottom = (scrollHeight - scrollTop - offsetHeight) - effectiveGrowth <= BOTTOM_THRESHOLD;
-    if (!wasAtBottom || !isViewportNewest) return;
+    const isAtBottom = container.classList.contains(BOTTOM_SNAP_CLASS)
+      || (scrollHeight - scrollTop - offsetHeight <= BOTTOM_THRESHOLD);
+    if (!isAtBottom || !isViewportNewest) return;
 
     forceMutation(() => {
       resetScroll(container, scrollHeight - offsetHeight);
@@ -795,7 +799,114 @@ const MessageList = ({
 
   const [getContainerHeight, prevContainerHeightRef] = useContainerHeight(containerRef, canPost && !isSelectModeActive);
 
+  const isDraggingSelectionRef = useRef(false);
+  const potentialDragSelectionRef = useRef<{
+    startX: number;
+    startY: number;
+    startMsgId: number;
+    active: boolean;
+  }>({ startX: 0, startY: 0, startMsgId: 0, active: false });
+  const visitedSelectionIdsRef = useRef<Set<number>>(new Set());
+
+  const handleMouseDownForSelection = useLastCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    preventMessageInputBlur(e);
+    if (e.button !== 0) return;
+
+    const target = e.target as HTMLElement;
+    const isControlClick = Boolean(target.closest('.message-select-control'));
+    if (!isSelectModeActive && !isControlClick) return;
+
+    if (target.closest('a, button, input, textarea, .text-content, .MessageActions, .Reactions, .reply-markup')) {
+      if (!isControlClick) return;
+    }
+
+    const msgEl = target.closest<HTMLElement>('.Message[data-message-id]');
+    if (!msgEl) return;
+
+    const msgId = Number(msgEl.dataset.messageId);
+    if (!msgId) return;
+
+    potentialDragSelectionRef.current = {
+      startX: e.clientX,
+      startY: e.clientY,
+      startMsgId: msgId,
+      active: true,
+    };
+  });
+
+  const handleMouseMoveForSelection = useLastCallback((e: MouseEvent) => {
+    const potential = potentialDragSelectionRef.current;
+    if (e.buttons !== 1) {
+      if (potential.active || isDraggingSelectionRef.current) {
+        potential.active = false;
+        isDraggingSelectionRef.current = false;
+        visitedSelectionIdsRef.current.clear();
+      }
+      return;
+    }
+
+    if (potential.active && !isDraggingSelectionRef.current) {
+      const dist = Math.hypot(e.clientX - potential.startX, e.clientY - potential.startY);
+      if (dist > 8) {
+        isDraggingSelectionRef.current = true;
+        visitedSelectionIdsRef.current = new Set([potential.startMsgId]);
+        if (!selectIsMessageSelected(getGlobal(), potential.startMsgId)) {
+          getActions().toggleMessageSelection({ messageId: potential.startMsgId, withShift: false });
+        }
+      }
+    }
+
+    if (!isDraggingSelectionRef.current) return;
+
+    const target = e.target as HTMLElement;
+    const msgEl = target?.closest?.<HTMLElement>('.Message[data-message-id]')
+      || document.elementFromPoint(e.clientX, e.clientY)?.closest<HTMLElement>('.Message[data-message-id]');
+    if (!msgEl) return;
+
+    const msgId = Number(msgEl.dataset.messageId);
+    if (!msgId || visitedSelectionIdsRef.current.has(msgId)) return;
+
+    visitedSelectionIdsRef.current.add(msgId);
+    if (!selectIsMessageSelected(getGlobal(), msgId)) {
+      getActions().toggleMessageSelection({ messageId: msgId, withShift: false });
+    }
+  });
+
+  useEffect(() => {
+    const handleGlobalMouseUp = () => {
+      if (isDraggingSelectionRef.current) {
+        const suppressClick = (e: MouseEvent) => {
+          e.stopPropagation();
+          e.preventDefault();
+        };
+        window.addEventListener('click', suppressClick, { capture: true, once: true });
+      }
+      potentialDragSelectionRef.current.active = false;
+      isDraggingSelectionRef.current = false;
+      visitedSelectionIdsRef.current.clear();
+    };
+    window.addEventListener('mouseup', handleGlobalMouseUp);
+    window.addEventListener('mousemove', handleMouseMoveForSelection);
+    return () => {
+      window.removeEventListener('mouseup', handleGlobalMouseUp);
+      window.removeEventListener('mousemove', handleMouseMoveForSelection);
+    };
+  }, []);
+
   const handleWheel = useLastCallback((e: React.WheelEvent<HTMLDivElement>) => {
+    if (isDraggingSelectionRef.current && e.buttons === 1) {
+      const el = document.elementFromPoint(e.clientX, e.clientY)?.closest<HTMLElement>('.Message[data-message-id]');
+      if (el) {
+        const msgId = Number(el.dataset.messageId);
+        if (msgId && !visitedSelectionIdsRef.current.has(msgId)) {
+          visitedSelectionIdsRef.current.add(msgId);
+          if (!selectIsMessageSelected(getGlobal(), msgId)) {
+            getActions().toggleMessageSelection({ messageId: msgId, withShift: false });
+          }
+        }
+      }
+    }
+
     if (e.deltaY > 0) {
       isLiveTailAutoScrollingRef.current = false;
       allowLiveTailBottomSnap();
@@ -947,11 +1058,6 @@ const MessageList = ({
       }),
     );
 
-    const isFirstLoadWithSend = !prevRenderMessageIds?.length && Boolean(renderMessageIds?.length);
-    const isInSendCollapsePhase = (wasMessageAdded ? areAddedMessagesOutgoing : isCurrentLastMessageOwnSent)
-      && (wasMessageAdded || isFirstLoadWithSend)
-      && isSendCollapsePhaseActive(container);
-
     const messageListParent = container.parentElement!;
     const hasForcedMessagesScroll = messageListParent.classList.contains(FORCE_MESSAGES_SCROLL_CLASS);
     // Add extra height when few messages to allow scroll animation
@@ -959,7 +1065,6 @@ const MessageList = ({
       isViewportNewest
       && wasMessageAdded
       && !hasLiveTail
-      && !isInSendCollapsePhase
       && (hasForcedMessagesScroll || (
         renderMessageIds!.length < MESSAGE_LIST_SLICE / 2
         && forceMeasure(() => (
@@ -1038,45 +1143,56 @@ const MessageList = ({
         && (isAtBottom || wasAtBottomBeforeTypingDraft),
       );
 
-      const isAlreadyFocusing = currentLastMessageId !== undefined
-        && memoFocusingIdRef.current === currentLastMessageId;
+      const isFocusingActive = memoFocusingIdRef.current !== undefined;
+      const isAlreadyFocusing = isFocusingActive
+        || (currentLastMessageId !== undefined && memoFocusingIdRef.current === currentLastMessageId);
 
-      // Animate incoming message, but if app is in background mode, scroll to the first unread
-      if (wasMessageAdded && isAtBottom && (!isAlreadyFocusing || shouldReleaseLiveTail) && (
-        !hasLiveTail || shouldReleaseLiveTail
-      )) {
-        // Break out of `forceLayout`
-        requestMeasure(() => {
-          const isScrollToBottom = !isBackgroundModeActive() || !firstUnreadElement;
-          const topReserve = getMessageListTopReserve(container);
-          const isFewMessagesScroll = container.parentElement?.classList.contains(FORCE_MESSAGES_SCROLL_CLASS);
-          const maxDistance = isFewMessagesScroll && isScrollToBottom
-            ? FEW_MESSAGES_SCROLL_RISE
-            : undefined;
-          animateScroll({
-            container,
-            element: isScrollToBottom ? lastItemElement : firstUnreadElement,
-            position: isScrollToBottom ? 'end' : 'start',
-            margin: BOTTOM_FOCUS_MARGIN + (isScrollToBottom ? bottomReserve : topReserve),
-            topReserve,
-            bottomReserve,
-            maxDistance,
-            forceDuration: noMessageSendingAnimation ? 0 : undefined,
-          });
+      // Animate incoming/outgoing message, but if app is in background mode, scroll to the first unread
+      const shouldAnimateAddedMessages = Boolean(
+        wasMessageAdded
+        && isAtBottom
+        && !isFocusingActive
+        && (!hasLiveTail || shouldReleaseLiveTail)
+        && (lastItemElement || firstUnreadElement),
+      );
 
-          if (shouldReleaseLiveTail && effectiveLiveTailStartOriginalId !== undefined) {
-            clearTimeout(liveTailReleaseTimerRef.current);
+      const isScrollToBottom = !isBackgroundModeActive() || !firstUnreadElement;
+      const targetElement = isScrollToBottom
+        ? (container.querySelector<HTMLElement>('.fab-trigger') || lastItemElement)
+        : firstUnreadElement;
+      const topReserve = getMessageListTopReserve(container);
+      const isFewMessagesScroll = container.parentElement?.classList.contains(FORCE_MESSAGES_SCROLL_CLASS);
+      const maxDistance = isFewMessagesScroll && isScrollToBottom
+        ? FEW_MESSAGES_SCROLL_RISE
+        : undefined;
 
-            liveTailReleaseTimerRef.current = window.setTimeout(() => {
-              liveTailReleaseTimerRef.current = undefined;
-              setReleasedLiveTailStartOriginalId(effectiveLiveTailStartOriginalId);
-            }, SEND_FOCUS_DURATION);
-          }
-        });
+      const animateAddedMessagesScroll = shouldAnimateAddedMessages && targetElement
+        ? animateScroll({
+          container,
+          element: targetElement,
+          position: isScrollToBottom ? 'end' : 'start',
+          margin: isScrollToBottom ? bottomReserve : (BOTTOM_FOCUS_MARGIN + topReserve),
+          topReserve,
+          bottomReserve,
+          maxDistance,
+          forceDuration: noMessageSendingAnimation ? 0 : undefined,
+          shouldReturnMutationFn: true,
+          isScrollToBottom,
+          effectiveScrollHeight,
+        })
+        : undefined;
+
+      if (shouldAnimateAddedMessages && shouldReleaseLiveTail && effectiveLiveTailStartOriginalId !== undefined) {
+        clearTimeout(liveTailReleaseTimerRef.current);
+
+        liveTailReleaseTimerRef.current = window.setTimeout(() => {
+          liveTailReleaseTimerRef.current = undefined;
+          setReleasedLiveTailStartOriginalId(effectiveLiveTailStartOriginalId);
+        }, SEND_FOCUS_DURATION);
       }
 
       const isResized = prevContainerHeight !== undefined && prevContainerHeight !== containerHeight;
-      if (isResized && isAnimatingScroll(container)) {
+      if (isAnimatingScroll(container)) {
         return undefined;
       }
 
@@ -1151,7 +1267,6 @@ const MessageList = ({
       }
 
       let newScrollTop!: number;
-      let isParkedForSendCollapse = false;
       if (liveTailElement) {
         const liveTailOffset = getOffsetToContainer(liveTailElement, container).top;
         newScrollTop = liveTailOffset + liveTailElement.offsetHeight - offsetHeight;
@@ -1161,15 +1276,8 @@ const MessageList = ({
         newScrollTop = typingDraftScrollTop;
       } else if (shouldRevealTypingDraft) {
         newScrollTop = scrollTop;
-      } else if (isAtBottom && (isResized || isInSendCollapsePhase)) {
+      } else if (isAtBottom && (isResized || isScrollToBottom)) {
         newScrollTop = scrollHeight - offsetHeight;
-        if (isInSendCollapsePhase) {
-          isParkedForSendCollapse = true;
-          const revealShift = addedTailHeight + reserveDelta;
-          if (revealShift > MIN_SEND_COLLAPSE_REVEAL_SHIFT && !noMessageSendingAnimation) {
-            newScrollTop -= revealShift;
-          }
-        }
       } else if (anchor) {
         const newAnchorTop = anchor.getBoundingClientRect().top;
         newScrollTop = scrollTop + (newAnchorTop - (anchorTopRef.current || 0));
@@ -1184,14 +1292,14 @@ const MessageList = ({
 
       const isBottomAnchored = !liveTailElement && !shouldFocusLiveTail && typingDraftScrollTop === undefined
         && !shouldRevealTypingDraft && !anchor && !unreadDivider;
-      if (isBottomAnchored || isParkedForSendCollapse) {
+      if (isBottomAnchored) {
         newScrollTop += reserveDelta;
       }
 
       return () => {
         applyMessageListBottomInset(container, bottomReserve);
 
-        const animateScrollMutation = animateLiveTailScroll || animateTypingDraftScroll;
+        const animateScrollMutation = animateLiveTailScroll || animateTypingDraftScroll || animateAddedMessagesScroll;
         if (animateScrollMutation) {
           const animationStartScrollTop = shouldRestoreBeforeTypingDraftAnimation && scrollTopBeforeUpdate !== undefined
             ? scrollTopBeforeUpdate
@@ -1216,9 +1324,7 @@ const MessageList = ({
         });
         restartCurrentScrollAnimation();
 
-        scrollOffsetRef.current = isParkedForSendCollapse
-          ? offsetHeight
-          : Math.max(Math.ceil(effectiveScrollHeight - newScrollTop), offsetHeight);
+        scrollOffsetRef.current = Math.max(Math.ceil(effectiveScrollHeight - newScrollTop), offsetHeight);
 
         if (!memoFocusingIdRef.current) {
           isScrollTopJustUpdatedRef.current = true;
@@ -1406,7 +1512,7 @@ const MessageList = ({
       shouldCleanup
       onScroll={handleScroll}
       onWheel={handleWheel}
-      onMouseDown={preventMessageInputBlur}
+      onMouseDown={handleMouseDownForSelection}
     >
       {renderContent()}
     </Transition>

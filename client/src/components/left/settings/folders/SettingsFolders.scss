@@ -264,8 +264,30 @@
 }
 
 .settings-folders-icon-picker-menu-folders {
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(2.625rem, 1fr));
+  gap: 0.25rem;
+  padding: 0.5rem;
+  max-height: 12.5rem;
+  overflow-y: auto;
   border-bottom: 1px solid var(--color-borders);
   color: var(--color-text-secondary);
+
+  .EmojiButton {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.625rem;
+    height: 2.625rem;
+    border-radius: var(--border-radius-default);
+    font-size: 1.375rem;
+    cursor: var(--custom-cursor, pointer);
+    transition: background-color 150ms, color 150ms;
+
+    &:hover {
+      background-color: var(--color-chat-hover, rgba(0, 0, 0, 0.08));
+      color: var(--color-text);
+    }
+  }
 }
+

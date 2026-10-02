@@ -74,7 +74,7 @@ const SenderInfo: FC<OwnProps & StateProps> = ({
     const avatar = profilePhotos?.photos[item.mediaIndex!];
     const isFallbackAvatar = avatar?.id === profilePhotos?.fallbackPhoto?.id;
     const isPersonalAvatar = avatar?.id === profilePhotos?.personalPhoto?.id;
-    const date = item.type === 'message' ? item.message.date : avatar?.date;
+    const date = item.type === 'message' ? item.message?.date : avatar?.date;
     if (!date) return undefined;
 
     const formattedDate = formatMediaDateTime(lang, date * 1000, true);

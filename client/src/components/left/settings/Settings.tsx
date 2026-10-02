@@ -1,5 +1,5 @@
 import type { FC } from '@teact';
-import { memo, useRef, useState } from '@teact';
+import { memo, useEffect, useRef, useState } from '@teact';
 import { getActions, getGlobal } from '../../../global';
 
 import type { FolderEditDispatch, FoldersState } from '../../../hooks/reducers/useFoldersReducer';
@@ -188,6 +188,10 @@ const Settings: FC<OwnProps> = ({
     containerRef,
     selector: '.Transition_slide-active .settings-content,'
       + ' .Transition_slide-active .settings-main-scroll',
+  }, [currentScreen]);
+
+  useEffect(() => {
+    window.getSelection()?.removeAllRanges();
   }, [currentScreen]);
 
   const handleReset = useLastCallback((forceReturnToChatList?: true | Event) => {

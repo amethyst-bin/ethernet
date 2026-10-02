@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect } from '../lib/teact/teact';
-import { withGlobal } from '../global';
+import { getActions, withGlobal } from '../global';
 
 import type { GlobalState } from '../global/types';
 import type { ThemeKey } from '../types';
@@ -85,6 +85,32 @@ const App = ({
     if (IS_INSTALL_PROMPT_SUPPORTED) {
       setupBeforeInstallPrompt();
     }
+  }, []);
+
+  useEffect(() => {
+    const api = window.ethernetDesktop || window.hermesDesktop;
+    if (api?.onNotificationClick) {
+      return api.onNotificationClick((data: { chatId?: string; messageId?: number }) => {
+        if (data?.chatId) {
+          if (data.messageId) {
+            getActions().focusMessage({
+              chatId: data.chatId,
+              messageId: data.messageId,
+              shouldReplaceHistory: true,
+            });
+          } else {
+            getActions().openChat({
+              id: data.chatId,
+              shouldReplaceHistory: true,
+            });
+          }
+          if (window.focus) {
+            window.focus();
+          }
+        }
+      });
+    }
+    return undefined;
   }, []);
 
   useEffect(() => {

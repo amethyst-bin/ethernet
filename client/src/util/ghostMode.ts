@@ -201,6 +201,7 @@ export function getEffectiveGhostSettings(userId?: string): GhostSettings {
     disableAds: base.disableAds !== undefined ? Boolean(base.disableAds) : DEFAULT_GHOST_SETTINGS.disableAds,
     disableAllNotifications: base.disableAllNotifications !== undefined ? Boolean(base.disableAllNotifications) : DEFAULT_GHOST_SETTINGS.disableAllNotifications,
     disableCloseToTray: base.disableCloseToTray !== undefined ? Boolean(base.disableCloseToTray) : DEFAULT_GHOST_SETTINGS.disableCloseToTray,
+    disableNftGifts: base.disableNftGifts !== undefined ? Boolean(base.disableNftGifts) : DEFAULT_GHOST_SETTINGS.disableNftGifts,
   };
 }
 

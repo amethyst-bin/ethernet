@@ -180,6 +180,7 @@ const ReactionButton = ({
         className,
       )}
       size="tiny"
+      color="translucent"
       ref={ref}
       onMouseDown={handleBeforeContextMenu}
       onContextMenu={handleContextMenu}

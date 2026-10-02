@@ -242,6 +242,17 @@ const MessageSelectToolbar = ({
             </>
           ) : (
             <>
+              <div
+                role="button"
+                tabIndex={0}
+                className="div-button item cancel-button"
+                onClick={handleExitMessageSelectMode}
+                title={lang('Cancel')}
+                aria-label={lang('Cancel')}
+              >
+                <Icon name="close" />
+                <span className="cancel-button-label">{lang('Cancel')}</span>
+              </div>
               {Boolean(rendering.selectedMessagesCount) && rendering.canDeleteMessages && (
                 renderButton('delete', oldLang('EditAdminGroupDeleteMessages'), handleDelete, true)
               )}

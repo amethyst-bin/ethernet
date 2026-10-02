@@ -23,7 +23,7 @@
   padding: 0.5rem 0.75rem;
   border-radius: var(--border-radius-messages);
 
-  color: white;
+  color: var(--color-text, #ffffff);
 
   @include mixins.action-message-bg($isModule: true);
 }
@@ -38,7 +38,7 @@
   padding: 0.1875rem 0.5rem;
   border-radius: var(--border-radius-messages);
 
-  color: white;
+  color: var(--color-text, #ffffff);
 
   @include mixins.action-message-bg($isModule: true);
 }

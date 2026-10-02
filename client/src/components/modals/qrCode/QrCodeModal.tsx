@@ -73,7 +73,7 @@ const QrCodeModal = ({
 }: OwnProps & StateProps) => {
   const { closeQrCodeModal, showNotification } = getActions();
 
-  const url = username ? formatUsername(username, true) : undefined;
+  const url = username ? `https://t.me/${username}` : undefined;
   const isOpen = Boolean(modal) && Boolean(peer) && Boolean(url);
 
   const avatarRef = useRef<HTMLDivElement>();

@@ -5,7 +5,7 @@ import { getActions, withGlobal } from '../../../global';
 import type { ApiChatFolder, ApiChatlistExportedInvite } from '../../../api/types';
 import type { GlobalState } from '../../../global/types';
 import type { FolderEditDispatch } from '../../../hooks/reducers/useFoldersReducer';
-import type { AnimationLevel } from '../../../types';
+import type { AnimationLevel, FoldersPosition } from '../../../types';
 
 import { ALL_FOLDER_ID } from '../../../config';
 import { selectTabState } from '../../../global/selectors';
@@ -51,6 +51,7 @@ type StateProps = {
   hasArchivedStories?: boolean;
   archiveSettings: GlobalState['archiveSettings'];
   isStoryRibbonShown?: boolean;
+  foldersPosition?: FoldersPosition;
 };
 
 const SAVED_MESSAGES_HOTKEY = '0';
@@ -74,6 +75,7 @@ const ChatFolders: FC<OwnProps & StateProps> = ({
   archiveSettings,
   isStoryRibbonShown,
   isFoldersSidebarShown,
+  foldersPosition,
 }) => {
   const {
     loadChatFolders,
@@ -324,6 +326,7 @@ export default memo(withGlobal<OwnProps>(
       maxChatLists: selectCurrentLimit(global, 'chatlistJoined'),
       archiveSettings,
       isStoryRibbonShown,
+      foldersPosition: selectSharedSettings(global).foldersPosition,
     };
   },
 )(ChatFolders));

@@ -422,7 +422,7 @@ const MediaViewer = ({
       loadMoreProfilePhotos({ peerId: item.avatarOwner.id });
     }
 
-    if (item.type === 'message' && withDynamicLoading) {
+    if (item.type === 'message' && withDynamicLoading && item.message) {
       searchChatMediaMessages({ chatId, threadId, currentMediaMessageId: item.message.id });
     }
   });

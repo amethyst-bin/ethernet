@@ -57,6 +57,7 @@ const DICTIONARY: Record<string, { ru: string; en: string }> = {
   EthernetSectionAnimations: { ru: 'Анимации', en: 'Animations' },
   EthernetBorderRadius: { ru: 'Радиус скругления', en: 'Corner radius' },
   EthernetRadiusUi: { ru: 'Интерфейс и панели', en: 'Interface & Panels' },
+  EthernetRadiusFoldersSidebar: { ru: 'Боковое меню папок', en: 'Folders sidebar' },
   EthernetRadiusMessages: { ru: 'Сообщения', en: 'Message bubbles' },
   EthernetRadiusButtons: { ru: 'Кнопки и поля ввода', en: 'Buttons & inputs' },
   EthernetRadiusAvatars: { ru: 'Аватарки (%)', en: 'Avatars (%)' },
@@ -67,6 +68,7 @@ const DICTIONARY: Record<string, { ru: string; en: string }> = {
   EthernetColorLinks: { ru: 'Цветной текст и гиперссылки', en: 'Colored text & links' },
   EthernetColorTextSecondary: { ru: 'Вторичный текст (время, статус)', en: 'Secondary text (time, status)' },
   EthernetColorPrimary: { ru: 'Акцентный цвет', en: 'Accent' },
+  EthernetColorIconButtons: { ru: 'Иконки кнопок', en: 'Button icons' },
   EthernetColorTextMetaColored: { ru: 'Галочки прочтения сообщений', en: 'Read checkmarks' },
   EthernetColorBackgroundOwn: { ru: 'Свои сообщения', en: 'Own message bubble' },
   EthernetColorChatActive: { ru: 'Активный чат', en: 'Active chat' },
@@ -236,5 +238,5 @@ export function getEthernetString(lang: LangFn | undefined, key: string): string
   if (entry) {
     return isRu ? entry.ru : entry.en;
   }
-  return lang ? lang(key) : key;
+  return lang ? (lang(key as any) as unknown as string) : key;
 }

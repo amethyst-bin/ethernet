@@ -401,7 +401,7 @@ export async function notifyAboutCall({
   if (window.ethernetDesktop?.showNotification) {
     window.ethernetDesktop.showNotification({
       title: oldTranslate('VoipIncoming'),
-      body: getUserFullName(user),
+      body: getUserFullName(user) || '',
       icon,
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     });
@@ -573,11 +573,18 @@ export function notifyClientReady() {
 if (typeof window !== 'undefined') {
   window.ethernetDesktop?.onNotificationClick?.((data: { chatId?: string; messageId?: number }) => {
     if (data?.chatId) {
-      getActions().focusMessage({
-        chatId: data.chatId,
-        messageId: data.messageId,
-        shouldReplaceHistory: true,
-      });
+      if (data.messageId) {
+        getActions().focusMessage({
+          chatId: data.chatId,
+          messageId: data.messageId,
+          shouldReplaceHistory: true,
+        });
+      } else {
+        getActions().openChat({
+          id: data.chatId,
+          shouldReplaceHistory: true,
+        });
+      }
       if (window.focus) {
         window.focus();
       }

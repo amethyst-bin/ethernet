@@ -148,6 +148,24 @@
       transition: none !important;
     }
 
+    &.cancel-button {
+      border-radius: var(--border-radius-default);
+      padding-inline: 0.625rem;
+      gap: 0.35rem;
+      align-items: center;
+
+      .cancel-button-label {
+        font-size: 0.875rem;
+        font-weight: var(--font-weight-medium);
+        color: var(--color-text-secondary);
+        user-select: none;
+      }
+
+      &:hover .cancel-button-label {
+        color: var(--color-text);
+      }
+    }
+
     @media (hover: hover) {
       &:hover, &:focus {
         text-decoration: none;

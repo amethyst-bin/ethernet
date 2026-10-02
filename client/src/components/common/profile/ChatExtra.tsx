@@ -361,7 +361,7 @@ const ChatExtra = ({
                     {idx > 0 ? ', ' : ''}
                     <a
                       key={username.username}
-                      href={formatUsername(username.username, true)}
+                      href={`https://${formatUsername(username.username, true)}`}
                       onMouseDown={stopEvent}
                       onClick={(e) => {
                         stopEvent(e);
@@ -396,6 +396,7 @@ const ChatExtra = ({
             color="translucent"
             ariaLabel={lang('QrCodeTitle')}
             onClick={handleOpenQrCode}
+            className={styles.qrButton}
           >
             <QrIcon />
           </Button>
@@ -404,7 +405,7 @@ const ChatExtra = ({
           handleUsernameClick(mainUsername, isChat);
         }}
       >
-        <span className="title" dir={lang.isRtl ? 'rtl' : undefined}>
+        <span className={buildClassName('title', styles.linkItemTitle)} dir={lang.isRtl ? 'rtl' : undefined}>
           {formatUsername(mainUsername.username, isChat)}
         </span>
         <span className="subtitle">
@@ -447,7 +448,7 @@ const ChatExtra = ({
           </Island>
         </div>
       )}
-      <Island>
+      <Island className={styles.infoIsland}>
         {Boolean(formattedNumber?.length) && (
           <ListItem
             icon={isInSettings ? 'phone-filled' : 'phone'}
@@ -498,7 +499,7 @@ const ChatExtra = ({
             onClick={() => copy(link, oldLang('SetUrlPlaceholder'))}
             style={createVtnStyle('link')}
           >
-            <div className="title">{link}</div>
+            <div className={buildClassName('title', styles.linkItemTitle)}>{link.replace(/^https?:\/\//, '')}</div>
             <span className="subtitle">{oldLang('SetUrlPlaceholder')}</span>
           </ListItem>
         )}

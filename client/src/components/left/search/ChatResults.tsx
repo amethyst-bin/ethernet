@@ -127,11 +127,7 @@ const ChatResults: FC<OwnProps & StateProps> = ({
 
   const handleChatClick = useCallback(
     (id: string) => {
-      if (searchQuery) {
-        openThreadWithInfo({ chatId: id, isOwnProfile: false });
-      } else {
-        openChat({ id, shouldReplaceHistory: true });
-      }
+      openChat({ id, shouldReplaceHistory: true });
 
       if (id !== currentUserId) {
         addRecentlyFoundChatId({ id });
@@ -141,7 +137,7 @@ const ChatResults: FC<OwnProps & StateProps> = ({
         onReset();
       }
     },
-    [openThreadWithInfo, openChat, searchQuery, currentUserId, isMobile, addRecentlyFoundChatId, onReset],
+    [openChat, currentUserId, isMobile, addRecentlyFoundChatId, onReset],
   );
 
   const handlePickerItemClick = useCallback((id: string) => {

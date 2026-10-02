@@ -162,38 +162,31 @@ const RightColumn: FC<OwnProps & StateProps> = ({
 
   useLayoutEffect(() => {
     if (!isProfile) return undefined;
-    const leftColumn = document.getElementById('LeftColumn');
     const rightColumn = document.getElementById('RightColumn');
-    const mainEl = document.getElementById('Main');
-    if (!leftColumn || !rightColumn) return undefined;
+    if (!rightColumn) return undefined;
 
-    const syncBounds = () => {
-      const mainRect = mainEl ? mainEl.getBoundingClientRect() : { left: 0 };
-      const leftRect = leftColumn.getBoundingClientRect();
-      if (leftRect.width > 0) {
-        const leftOffset = Math.round(leftRect.left - (mainRect.left || 0));
-        const widthPx = `${Math.round(leftRect.width)}px`;
-        rightColumn.style.setProperty('left', `${leftOffset}px`, 'important');
-        rightColumn.style.setProperty('width', widthPx, 'important');
-        rightColumn.style.setProperty('max-width', widthPx, 'important');
-        rightColumn.style.setProperty('min-width', widthPx, 'important');
-      }
-    };
+    rightColumn.style.removeProperty('left');
+    rightColumn.style.removeProperty('right');
+    rightColumn.style.removeProperty('width');
+    rightColumn.style.removeProperty('max-width');
+    rightColumn.style.removeProperty('min-width');
+    rightColumn.style.removeProperty('top');
+    rightColumn.style.removeProperty('bottom');
+    rightColumn.style.removeProperty('height');
+    rightColumn.style.removeProperty('max-height');
 
-    syncBounds();
-    const observer = new ResizeObserver(syncBounds);
-    observer.observe(leftColumn);
-    if (mainEl) observer.observe(mainEl);
-    window.addEventListener('resize', syncBounds);
     return () => {
-      observer.disconnect();
-      window.removeEventListener('resize', syncBounds);
       rightColumn.style.removeProperty('left');
+      rightColumn.style.removeProperty('right');
       rightColumn.style.removeProperty('width');
       rightColumn.style.removeProperty('max-width');
       rightColumn.style.removeProperty('min-width');
+      rightColumn.style.removeProperty('top');
+      rightColumn.style.removeProperty('bottom');
+      rightColumn.style.removeProperty('height');
+      rightColumn.style.removeProperty('max-height');
     };
-  }, [isProfile, isOpen]);
+  }, [isProfile]);
 
   useLayoutEffect(() => {
     const elements = containerRef.current?.querySelectorAll<HTMLElement>(

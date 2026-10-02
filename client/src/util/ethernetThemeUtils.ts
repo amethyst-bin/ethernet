@@ -1,8 +1,55 @@
 import type { HermesMod } from '../types/ethernet';
 
-export function modToCss(mod: HermesMod, themeName = 'Кастомная'): string {
+/**
+ * Разделяет CSS темы на блок переменных :root и блок пользовательского CSS.
+ * Позволяет безопасно редактировать переменные через интерфейс без потери кастомных правил.
+ */
+export function splitThemeCss(css: string): { rootCss: string; customCss: string } {
+  if (!css || typeof css !== 'string') return { rootCss: '', customCss: '' };
+
+  const rootIndex = css.indexOf(':root');
+  if (rootIndex === -1) {
+    return { rootCss: '', customCss: css.trim() };
+  }
+
+  const openBrace = css.indexOf('{', rootIndex);
+  if (openBrace === -1) {
+    return { rootCss: '', customCss: css.trim() };
+  }
+
+  let depth = 1;
+  let closeBrace = -1;
+  for (let i = openBrace + 1; i < css.length; i++) {
+    if (css[i] === '{') depth++;
+    else if (css[i] === '}') {
+      depth--;
+      if (depth === 0) {
+        closeBrace = i;
+        break;
+      }
+    }
+  }
+
+  if (closeBrace === -1) {
+    return { rootCss: css, customCss: '' };
+  }
+
+  const rootCss = css.slice(0, closeBrace + 1);
+  const rawCustom = css.slice(closeBrace + 1).trim();
+  const cleanedCustom = rawCustom
+    .replace(/^\s*\/\* === (Кастомные стили CSS|Пользовательские стили CSS|Custom CSS)[^/]*\*\/[\r\n]*/i, '')
+    .trim();
+
+  return { rootCss, customCss: cleanedCustom };
+}
+
+/**
+ * Преобразует параметры EthernetMod в валидный CSS.
+ * Сохраняет пользовательский блок customCss без потерь!
+ */
+export function modToCss(mod: HermesMod, themeName = 'Кастомная', customCssOverride?: string): string {
   const lines: string[] = [
-    `/* Hermes Telegram Theme: ${themeName} */`,
+    `/* Ethernet Telegram Theme: ${themeName} */`,
     `:root {`,
   ];
 
@@ -35,6 +82,7 @@ export function modToCss(mod: HermesMod, themeName = 'Кастомная'): stri
 
   if (mod.radii) {
     if (mod.radii.ui !== undefined) lines.push(`  --border-radius-ui: ${mod.radii.ui}px;`);
+    if (mod.radii.foldersSidebar !== undefined) lines.push(`  --border-radius-folders-sidebar: ${mod.radii.foldersSidebar / 16}rem;`);
     if (mod.radii.messages !== undefined) lines.push(`  --border-radius-messages: ${mod.radii.messages}px;`);
     if (mod.radii.buttons !== undefined) lines.push(`  --border-radius-buttons: ${mod.radii.buttons}px;`);
     if (mod.radii.avatars !== undefined) lines.push(`  --border-radius-avatars: ${mod.radii.avatars}%;`);
@@ -70,7 +118,7 @@ export function modToCss(mod: HermesMod, themeName = 'Кастомная'): stri
   }
 
   if (mod.disableSnapEffect) {
-    lines.push(`  --hermes-disable-snap-effect: true;`);
+    lines.push(`  --ethernet-disable-snap-effect: true;`);
   }
 
   if (mod.chatWidth) {
@@ -84,30 +132,48 @@ export function modToCss(mod: HermesMod, themeName = 'Кастомная'): stri
   }
 
   lines.push(`}`);
+
+  const customCss = customCssOverride !== undefined ? customCssOverride : mod.customCss;
+  if (customCss && customCss.trim()) {
+    lines.push('');
+    lines.push('/* === Пользовательские стили CSS === */');
+    lines.push(customCss.trim());
+  }
+
   return lines.join('\n') + '\n';
 }
 
+/**
+ * Парсит CSS темы в структуру EthernetMod, сохраняя все кастомные стили в customCss.
+ */
 export function cssToMod(css: string): HermesMod {
+  const { rootCss, customCss } = splitThemeCss(css);
+  const targetCss = rootCss || css;
+
   const mod: HermesMod = {
     colors: {},
     radii: {},
     blurTargets: {},
+    customCss: customCss || undefined,
   };
 
   const varRegex = /--([\w-]+)\s*:\s*([^;]+);/g;
   let match: RegExpExecArray | null;
 
-  while ((match = varRegex.exec(css)) !== null) {
+  while ((match = varRegex.exec(targetCss)) !== null) {
     const key = `--${match[1]}`;
     const rawVal = match[2].trim();
 
     if (key.startsWith('--color-')) {
       const cleanVal = rawVal.replace(/\s*!important/g, '').trim();
-      if (cleanVal.startsWith('#') || cleanVal.startsWith('rgb')) {
+      if (cleanVal.startsWith('#') || cleanVal.startsWith('rgb') || cleanVal.startsWith('hsl')) {
         mod.colors![key] = cleanVal;
       }
     } else if (key === '--border-radius-ui') {
       mod.radii!.ui = parseInt(rawVal, 10) || 16;
+    } else if (key === '--border-radius-folders-sidebar') {
+      const parsed = parseFloat(rawVal);
+      mod.radii!.foldersSidebar = rawVal.endsWith('rem') ? Math.round(parsed * 16) : Math.round(parsed);
     } else if (key === '--border-radius-messages') {
       mod.radii!.messages = parseInt(rawVal, 10) || 15;
     } else if (key === '--border-radius-buttons') {
@@ -130,7 +196,7 @@ export function cssToMod(css: string): HermesMod {
       mod.blurTargets!.menus = rawVal === 'true';
     } else if (key === '--animations-disabled') {
       mod.animationsDisabled = rawVal === 'true';
-    } else if (key === '--hermes-disable-snap-effect') {
+    } else if (key === '--hermes-disable-snap-effect' || key === '--ethernet-disable-snap-effect') {
       mod.disableSnapEffect = rawVal === 'true';
     } else if (key === '--animation-duration') {
       mod.animationDuration = parseInt(rawVal, 10) || 300;

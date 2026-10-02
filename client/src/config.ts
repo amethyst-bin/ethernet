@@ -35,8 +35,8 @@ export const BETA_CHANGELOG_URL = 'https://telegra.ph/WebA-Beta-03-20';
 export const DEBUG_ALERT_MSG = 'Shoot!\nSomething went wrong, please see the error details in Dev Tools Console.';
 export const DEBUG_GRAMJS = false;
 
-export const PAGE_TITLE = import.meta.env.TG_APP_TITLE || 'Ethernet';
-export const PAGE_TITLE_TAURI = 'Telegram Air';
+export const PAGE_TITLE = import.meta.env.TG_APP_TITLE || 'ethernet';
+export const PAGE_TITLE_TAURI = 'ethernet';
 export const INACTIVE_MARKER = '[Inactive]';
 export const TELEGRAM_API_ID = Number(import.meta.env.TG_TELEGRAM_API_ID);
 export const TELEGRAM_API_HASH = import.meta.env.TG_TELEGRAM_API_HASH;
@@ -47,7 +47,7 @@ export const DEBUG_PAYMENT_SMART_GLOCAL = false;
 export const SESSION_LEGACY_USER_KEY = 'user_auth';
 export const SESSION_ACCOUNT_PREFIX = 'account';
 
-export const MULTIACCOUNT_MAX_SLOTS = 6;
+export const MULTIACCOUNT_MAX_SLOTS = 100;
 export const GLOBAL_STATE_CACHE_DISABLED = false;
 export const GLOBAL_STATE_CACHE_PREFIX = 'tt-global-state';
 export const SHARED_STATE_CACHE_KEY = 'tt-shared-state';

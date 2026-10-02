@@ -59,7 +59,9 @@ const Invoice = ({
   useLayoutEffectWithPrevDeps(([prevShouldAffectAppendix]) => {
     if (!shouldAffectAppendix) {
       if (prevShouldAffectAppendix) {
-        ref.current!.closest<HTMLDivElement>(MESSAGE_CONTENT_SELECTOR)!.removeAttribute(CUSTOM_APPENDIX_ATTRIBUTE);
+        const contentEl = ref.current?.closest<HTMLDivElement>(MESSAGE_CONTENT_SELECTOR);
+        contentEl?.removeAttribute(CUSTOM_APPENDIX_ATTRIBUTE);
+        contentEl?.style.removeProperty('--appendix-bg');
       }
       return;
     }

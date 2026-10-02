@@ -3,6 +3,22 @@
 
 .Checkbox {
   cursor: var(--custom-cursor, pointer);
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  -webkit-tap-highlight-color: transparent !important;
+  outline: none !important;
+
+  &, & * {
+    user-select: none !important;
+    -webkit-user-select: none !important;
+    -webkit-tap-highlight-color: transparent !important;
+  }
+
+  &::selection,
+  *::selection {
+    background: transparent !important;
+    color: inherit !important;
+  }
 
   position: relative;
 

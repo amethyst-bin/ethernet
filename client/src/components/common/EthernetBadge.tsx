@@ -19,6 +19,7 @@ import { selectPeer, selectTheme } from '../../global/selectors';
 import useSelector from '../../hooks/data/useSelector';
 import usePeerColor from '../../hooks/usePeerColor';
 import buildClassName from '../../util/buildClassName';
+import buildStyle from '../../util/buildStyle';
 import stopEvent from '../../util/stopEvent';
 
 import Modal from '../ui/Modal';
@@ -34,7 +35,7 @@ type OwnProps = {
 };
 
 // SVG иконка Ethernet из /docs/ethernet-svg-logo-without-backdrop
-export const EthernetIconSvg: FC<{ className?: string; style?: React.CSSProperties }> = ({ className, style }) => (
+export const EthernetIconSvg: FC<{ className?: string; style?: string }> = ({ className, style }) => (
   <svg
     viewBox="0 0 133 133"
     className={buildClassName(styles.icon, className)}
@@ -120,7 +121,7 @@ const EthernetBadge: FC<OwnProps> = ({ peer, peerId, className, size }) => {
     ? 'Разработчик Ethernet'
     : 'Саппортер Ethernet';
 
-  const iconStyle = size ? { width: `${size}px`, height: `${size}px` } : undefined;
+  const iconStyle = size ? buildStyle(`width: ${size}px`, `height: ${size}px`) : undefined;
 
   return (
     <>

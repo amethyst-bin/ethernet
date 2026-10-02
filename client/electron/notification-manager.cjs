@@ -78,13 +78,28 @@ function getActiveMainWindow(provider) {
   return all.find((w) => w !== notifWindow && !w.isDestroyed()) || null;
 }
 
+function isNotifSender(event) {
+  if (notifWindow && !notifWindow.isDestroyed() && event.sender === notifWindow.webContents) return true;
+  const url = event.senderFrame?.url || (typeof event.sender?.getURL === 'function' ? event.sender.getURL() : '');
+  return url.includes('notifications.html');
+}
+
 function setupNotificationIpc(mainWindowProvider) {
-  ipcMain.handle('hermes:show-notification', (_event, payload) => {
+  const handleShowNotif = (event, payload) => {
+    const senderUrl = event.senderFrame?.url || (typeof event.sender?.getURL === 'function' ? event.sender.getURL() : '');
+    if (!senderUrl.startsWith('app://telegram/')) {
+      console.warn(`[Security] Blocked unauthorized notification from '${senderUrl}'`);
+      return false;
+    }
     showNotification(payload, mainWindowProvider);
     return true;
-  });
+  };
 
-  ipcMain.on('notif:clicked', (_event, data) => {
+  ipcMain.handle('hermes:show-notification', handleShowNotif);
+  ipcMain.handle('ethernet:show-notification', handleShowNotif);
+
+  ipcMain.on('notif:clicked', (event, data) => {
+    if (!isNotifSender(event)) return;
     const mainWindow = getActiveMainWindow(mainWindowProvider);
     if (mainWindow && !mainWindow.isDestroyed()) {
       if (mainWindow.isMinimized()) mainWindow.restore();
@@ -94,13 +109,15 @@ function setupNotificationIpc(mainWindowProvider) {
     }
   });
 
-  ipcMain.on('notif:ignore-mouse', (_event, ignore) => {
+  ipcMain.on('notif:ignore-mouse', (event, ignore) => {
+    if (!isNotifSender(event)) return;
     if (notifWindow && !notifWindow.isDestroyed()) {
       notifWindow.setIgnoreMouseEvents(Boolean(ignore), { forward: true });
     }
   });
 
-  ipcMain.on('notif:set-height', (_event, height) => {
+  ipcMain.on('notif:set-height', (event, height) => {
+    if (!isNotifSender(event)) return;
     currentHeight = height;
     if (notifWindow && !notifWindow.isDestroyed()) {
       if (height <= 0) {

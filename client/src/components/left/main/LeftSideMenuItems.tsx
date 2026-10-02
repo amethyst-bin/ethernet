@@ -38,8 +38,6 @@ import AttachBotItem from '../../middle/composer/AttachBotItem';
 import MenuItem from '../../ui/MenuItem';
 import MenuSeparator from '../../ui/MenuSeparator';
 import NestedMenuItem from '../../ui/NestedMenuItem';
-import Switcher from '../../ui/Switcher';
-import Toggle from '../../ui/Toggle';
 import AccountMenuItems from './AccountMenuItems';
 
 type OwnProps = {
@@ -78,17 +76,12 @@ const LeftSideMenuItems = ({
 }: OwnProps & StateProps) => {
   const {
     openChat,
-    setSharedSettingOption,
-    updatePerformanceSettings,
     openChatByUsername,
     openUrl,
     openChatWithInfo,
     openSettingsScreen,
   } = getActions();
   const lang = useLang();
-
-  const animationLevelValue = animationLevel !== ANIMATION_LEVEL_MIN
-    ? (animationLevel === ANIMATION_LEVEL_MAX ? 'max' : 'mid') : 'min';
 
   const withOtherVersions = !IS_TAURI && (window.location.hostname === PRODUCTION_HOSTNAME || IS_TEST);
 
@@ -102,30 +95,6 @@ const LeftSideMenuItems = ({
 
   const handleSelectSaved = useLastCallback(() => {
     openChat({ id: currentUserId });
-  });
-
-  const handleDarkModeToggle = useLastCallback((e: React.SyntheticEvent<HTMLElement>) => {
-    e.stopPropagation();
-    const newTheme = theme === 'light' ? 'dark' : 'light';
-    const shouldUseSystemTheme = newTheme === getSystemTheme();
-
-    setSharedSettingOption({ theme: newTheme });
-    setSharedSettingOption({ shouldUseSystemTheme });
-  });
-
-  const handleAnimationLevelChange = useLastCallback((e: React.SyntheticEvent<HTMLElement>) => {
-    e.stopPropagation();
-
-    let newLevel = animationLevel + 1;
-    if (newLevel > ANIMATION_LEVEL_MAX) {
-      newLevel = ANIMATION_LEVEL_MIN;
-    }
-    const performanceSettings = newLevel === ANIMATION_LEVEL_MIN
-      ? INITIAL_PERFORMANCE_STATE_MIN
-      : (newLevel === ANIMATION_LEVEL_MAX ? INITIAL_PERFORMANCE_STATE_MAX : INITIAL_PERFORMANCE_STATE_MED);
-
-    setSharedSettingOption({ animationLevel: newLevel as AnimationLevel, wasAnimationLevelSetManually: true });
-    updatePerformanceSettings(performanceSettings);
   });
 
   const handleChangelogClick = useLastCallback(() => {
@@ -206,26 +175,6 @@ const LeftSideMenuItems = ({
         footer={footer}
         submenu={(
           <>
-            <MenuItem
-              icon="darkmode"
-              onClick={handleDarkModeToggle}
-            >
-              <span className="menu-item-name">{lang('MenuNightMode')}</span>
-              <Switcher
-                id="darkmode"
-                label={lang(theme === 'dark' ? 'AriaMenuDisableNightMode' : 'AriaMenuEnableNightMode')}
-                checked={theme === 'dark'}
-                noAnimation
-              />
-            </MenuItem>
-            <MenuItem
-              icon="animations"
-              onClick={handleAnimationLevelChange}
-            >
-              <span className="menu-item-name capitalize">{lang('MenuUIFeaturesSwitch')}</span>
-              <Toggle value={animationLevelValue} />
-            </MenuItem>
-            <MenuSeparator />
             <MenuItem
               icon="help"
               onClick={handleOpenTipsChat}

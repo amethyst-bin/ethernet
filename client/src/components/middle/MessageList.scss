@@ -180,7 +180,16 @@
     position: relative;
     transform: scale(1);
     opacity: 1;
-    transition: opacity 0.2s ease, transform 0.2s ease;
+    transition: transform var(--layer-transition, 300ms cubic-bezier(0.33, 1, 0.68, 1)),
+                opacity var(--layer-transition, 300ms cubic-bezier(0.33, 1, 0.68, 1));
+
+    &.own {
+      transform-origin: bottom right;
+    }
+
+    &:not(.own) {
+      transform-origin: bottom left;
+    }
 
     &::before {
       content: "";
@@ -208,13 +217,9 @@
     }
 
     body.no-message-sending-animations & {
-      transform: none;
-      opacity: 1;
+      transform: none !important;
+      opacity: 1 !important;
       transition: none !important;
-    }
-
-    &.is-just-added {
-      transform: none;
     }
 
     // Restore stacking context
@@ -478,3 +483,4 @@
   from { transform: translateY(2rem); }
   to { transform: translateY(0); }
 }
+

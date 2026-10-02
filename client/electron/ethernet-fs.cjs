@@ -32,6 +32,25 @@ function safeName(name, ext) {
   return base + ext;
 }
 
+const allowedPickedPaths = new Set();
+
+function isSafeMediaBuffer(buf) {
+  if (!buf || buf.length < 4) return false;
+  // PNG: 89 50 4E 47
+  if (buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47) return true;
+  // JPEG: FF D8 FF
+  if (buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) return true;
+  // GIF: 47 49 46 38 ('GIF8')
+  if (buf[0] === 0x47 && buf[1] === 0x49 && buf[2] === 0x46 && buf[3] === 0x38) return true;
+  // WEBP: 'RIFF' .... 'WEBP'
+  if (buf.length >= 12 && buf.toString('ascii', 0, 4) === 'RIFF' && buf.toString('ascii', 8, 12) === 'WEBP') return true;
+  // MP4: ....ftyp
+  if (buf.length >= 8 && buf.toString('ascii', 4, 8) === 'ftyp') return true;
+  // WEBM / MKV: 1A 45 DF A3
+  if (buf[0] === 0x1a && buf[1] === 0x45 && buf[2] === 0xdf && buf[3] === 0xa3) return true;
+  return false;
+}
+
 function registerHermesFsHandlers() {
   ensureDirs();
 
@@ -61,11 +80,13 @@ function registerHermesFsHandlers() {
   });
 
   regHandle('hermes:theme-read', (_e, name) => {
-    const clean = path.basename(String(name || ''));
-    if (!clean.endsWith('.css') || clean.includes('..')) throw new Error('bad name');
-    const target = path.normalize(path.join(THEMES_DIR, clean));
+    const raw = String(name || '');
+    const cleanBase = path.basename(raw, '.css').replace(/[^\w\u0400-\u04FF -]+/g, '');
+    if (!cleanBase) throw new Error('bad name');
+    const target = path.normalize(path.join(THEMES_DIR, `${cleanBase}.css`));
     const resolvedThemes = path.resolve(THEMES_DIR);
-    if (!target.startsWith(resolvedThemes + path.sep)) throw new Error('bad path');
+    if (!target.toLowerCase().startsWith((resolvedThemes + path.sep).toLowerCase())) throw new Error('bad path');
+    if (!fs.existsSync(target)) throw new Error('theme not found');
     return fs.readFileSync(target, 'utf8');
   });
 
@@ -73,7 +94,7 @@ function registerHermesFsHandlers() {
     const safe = safeName(name, '.css');
     const target = path.normalize(path.join(THEMES_DIR, safe));
     const resolvedThemes = path.resolve(THEMES_DIR);
-    if (!target.startsWith(resolvedThemes + path.sep)) throw new Error('bad path');
+    if (!target.toLowerCase().startsWith((resolvedThemes + path.sep).toLowerCase())) throw new Error('bad path');
     fs.writeFileSync(target, String(css || ''), 'utf8');
     const cleanThemeName = safe.replace(/\.css$/, '');
     if (wallpaperInfo) {
@@ -88,15 +109,16 @@ function registerHermesFsHandlers() {
   });
 
   regHandle('hermes:theme-delete', (_e, name) => {
-    const clean = path.basename(String(name || ''));
-    if (!clean.endsWith('.css') || clean.includes('..')) throw new Error('bad name');
-    const target = path.normalize(path.join(THEMES_DIR, clean));
+    const raw = String(name || '');
+    const cleanBase = path.basename(raw, '.css').replace(/[^\w\u0400-\u04FF -]+/g, '');
+    if (!cleanBase) throw new Error('bad name');
+    const target = path.normalize(path.join(THEMES_DIR, `${cleanBase}.css`));
     const resolvedThemes = path.resolve(THEMES_DIR);
-    if (!target.startsWith(resolvedThemes + path.sep)) throw new Error('bad path');
+    if (!target.toLowerCase().startsWith((resolvedThemes + path.sep).toLowerCase())) throw new Error('bad path');
     if (fs.existsSync(target)) {
       fs.unlinkSync(target);
     }
-    ethernetSettings.setThemeWallpaper(clean.replace(/\.css$/, ''), null);
+    ethernetSettings.setThemeWallpaper(cleanBase, null);
     return true;
   });
 
@@ -136,7 +158,7 @@ function registerHermesFsHandlers() {
     const safeId = path.basename(id);
     const dir = path.normalize(path.join(PLUGINS_DIR, safeId));
     const resolvedPlugins = path.resolve(PLUGINS_DIR);
-    if (!dir.startsWith(resolvedPlugins + path.sep)) throw new Error('bad path');
+    if (!dir.toLowerCase().startsWith((resolvedPlugins + path.sep).toLowerCase())) throw new Error('bad path');
     const read = (f) => { try { return fs.readFileSync(path.join(dir, f), 'utf8'); } catch { return ''; } };
     return { manifest: read('manifest.json') || '{}', code: read('index.js') };
   });
@@ -149,7 +171,7 @@ function registerHermesFsHandlers() {
     if (!id) throw new Error('bad name');
     const dir = path.normalize(path.join(PLUGINS_DIR, id));
     const resolvedPlugins = path.resolve(PLUGINS_DIR);
-    if (!dir.startsWith(resolvedPlugins + path.sep)) throw new Error('bad path');
+    if (!dir.toLowerCase().startsWith((resolvedPlugins + path.sep).toLowerCase())) throw new Error('bad path');
     fs.mkdirSync(dir, { recursive: true });
     const manifest = {
       name: String(plugin.name || id).slice(0, 64),
@@ -167,7 +189,7 @@ function registerHermesFsHandlers() {
     const safeId = path.basename(id);
     const dir = path.normalize(path.join(PLUGINS_DIR, safeId));
     const resolvedPlugins = path.resolve(PLUGINS_DIR);
-    if (!dir.startsWith(resolvedPlugins + path.sep)) throw new Error('bad path');
+    if (!dir.toLowerCase().startsWith((resolvedPlugins + path.sep).toLowerCase())) throw new Error('bad path');
     fs.rmSync(dir, { recursive: true, force: true });
     ethernetSettings.removePlugin(id);
     return true;
@@ -201,11 +223,22 @@ function registerHermesFsHandlers() {
     });
     if (res.canceled || !res.filePaths[0]) return null;
     const file = res.filePaths[0];
-    if (isBinary) {
-      const buf = fs.readFileSync(file);
-      return { name: path.basename(file), content: buf.toString('base64') };
+    allowedPickedPaths.add(path.resolve(file));
+    if (allowedPickedPaths.size > 50) {
+      const oldest = allowedPickedPaths.values().next().value;
+      allowedPickedPaths.delete(oldest);
     }
-    return { name: path.basename(file), content: fs.readFileSync(file, 'utf8') };
+    if (isBinary) {
+      let content = '';
+      try {
+        const stats = fs.statSync(file);
+        if (stats.size <= 20 * 1024 * 1024) {
+          content = fs.readFileSync(file).toString('base64');
+        }
+      } catch {}
+      return { name: path.basename(file), path: file, content };
+    }
+    return { name: path.basename(file), path: file, content: fs.readFileSync(file, 'utf8') };
   });
 
   // Диалог сохранения файла (для экспорта .css тем на диск)
@@ -228,17 +261,54 @@ function registerHermesFsHandlers() {
 
   // --- Ethernet-обои: медиафайлы в wallpapers/ ---
   regHandle('hermes:wallpaper-set-file', (_e, payload) => {
-    // payload = { name, content/base64, originalPath, themeName }
+    // payload = { name, content/base64, originalPath, path, themeName }
     if (!payload || typeof payload !== 'object') throw new Error('bad payload');
+    const sourceFilePath = payload.path || payload.originalPath;
+    let hasSourceFile = Boolean(sourceFilePath && typeof sourceFilePath === 'string' && fs.existsSync(sourceFilePath));
     const rawData = payload.base64 || payload.content;
-    if (!rawData || typeof rawData !== 'string') throw new Error('bad media content');
-    // Ограничение 70MB base64 (~50MB бинарных данных) для защиты от OOM Crash
-    if (rawData.length > 70 * 1024 * 1024) throw new Error('media too large');
 
-    const ext = (path.extname(payload.name || '') || '.png').toLowerCase().replace(/[^\w.]/g, '');
+    // Проверяем, что файл действительно был выбран пользователем в системном диалоге
+    if (hasSourceFile) {
+      const resolvedSource = path.resolve(sourceFilePath);
+      if (!allowedPickedPaths.has(resolvedSource)) {
+        console.warn('[Security] Ignored unverified local file path for wallpaper:', sourceFilePath);
+        hasSourceFile = false;
+      }
+    }
+
+    if (!hasSourceFile && (!rawData || typeof rawData !== 'string')) {
+      throw new Error('bad media content');
+    }
+    // Лимит 500MB для любых тяжелых 4K/видео-обоев
+    if (rawData && rawData.length > 500 * 1024 * 1024) throw new Error('media too large');
+
+    const ext = (path.extname(payload.name || (hasSourceFile ? sourceFilePath : '')) || '.png').toLowerCase().replace(/[^\w.]/g, '');
     if (!['.png', '.jpg', '.jpeg', '.webp', '.gif', '.mp4', '.webm'].includes(ext)) {
       throw new Error('bad media type');
     }
+
+    if (hasSourceFile) {
+      const sourceExt = path.extname(sourceFilePath).toLowerCase();
+      if (!['.png', '.jpg', '.jpeg', '.webp', '.gif', '.mp4', '.webm'].includes(sourceExt)) {
+        throw new Error('bad source media extension');
+      }
+      const fd = fs.openSync(sourceFilePath, 'r');
+      const header = Buffer.alloc(16);
+      fs.readSync(fd, header, 0, 16, 0);
+      fs.closeSync(fd);
+      if (!isSafeMediaBuffer(header)) {
+        throw new Error('invalid media file header');
+      }
+    }
+
+    let mediaBuffer = null;
+    if (!hasSourceFile) {
+      mediaBuffer = Buffer.from(rawData, 'base64');
+      if (!isSafeMediaBuffer(mediaBuffer)) {
+        throw new Error('invalid media data');
+      }
+    }
+
     const slug = `ethernet-${Date.now()}`;
     const filename = slug + ext;
     const resolvedWallpapers = path.resolve(WALLPAPERS_DIR);
@@ -250,7 +320,7 @@ function registerHermesFsHandlers() {
         for (const oldFile of existing) {
           try {
             const oldTarget = path.normalize(path.join(WALLPAPERS_DIR, oldFile));
-            if (oldTarget.startsWith(resolvedWallpapers + path.sep)) {
+            if (oldTarget.toLowerCase().startsWith((resolvedWallpapers + path.sep).toLowerCase())) {
               fs.unlinkSync(oldTarget);
             }
           } catch {}
@@ -259,15 +329,20 @@ function registerHermesFsHandlers() {
     } catch {}
 
     const targetFile = path.normalize(path.join(WALLPAPERS_DIR, filename));
-    if (!targetFile.startsWith(resolvedWallpapers + path.sep)) throw new Error('bad path');
-    fs.writeFileSync(targetFile, Buffer.from(rawData, 'base64'));
+    if (!targetFile.toLowerCase().startsWith((resolvedWallpapers + path.sep).toLowerCase())) throw new Error('bad path');
+
+    if (hasSourceFile) {
+      fs.copyFileSync(sourceFilePath, targetFile);
+    } else {
+      fs.writeFileSync(targetFile, mediaBuffer);
+    }
 
     const isVideo = ['.mp4', '.webm'].includes(ext);
     const wallpaperInfo = {
       slug,
       file: filename,
       kind: isVideo ? 'video' : 'image',
-      originalPath: String(payload.originalPath || payload.name || '').slice(0, 256),
+      originalPath: String(hasSourceFile ? sourceFilePath : (payload.name || '')).slice(0, 256),
     };
     const currentTheme = payload.themeName || ethernetSettings.getTheme() || 'default';
     ethernetSettings.setThemeWallpaper(currentTheme, wallpaperInfo);
@@ -284,7 +359,7 @@ function registerHermesFsHandlers() {
         for (const oldFile of existing) {
           try {
             const oldTarget = path.normalize(path.join(WALLPAPERS_DIR, oldFile));
-            if (oldTarget.startsWith(resolvedWallpapers + path.sep)) {
+            if (oldTarget.toLowerCase().startsWith((resolvedWallpapers + path.sep).toLowerCase())) {
               fs.unlinkSync(oldTarget);
             }
           } catch {}

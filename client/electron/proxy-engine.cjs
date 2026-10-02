@@ -64,7 +64,7 @@ async function applyProxyToSession(proxy) {
     proxyAuthCredentials = null;
     for (const sess of sessions) {
       try {
-        await sess.setProxy({ mode: 'direct' });
+        await sess.setProxy({ mode: 'system' });
         if (typeof sess.closeAllConnections === 'function') {
           await sess.closeAllConnections();
         }
@@ -76,7 +76,7 @@ async function applyProxyToSession(proxy) {
         }
       } catch (e) { plog('clearProxy err', e.message); }
     }
-    plog('[ProxyEngine] Proxy disabled, direct connection active across all sessions');
+    plog('[ProxyEngine] In-app proxy disabled, system routing active across all sessions');
     return;
   }
 
@@ -203,7 +203,8 @@ async function getNetworkGeoInfo() {
   try {
     const endpoints = [
       'https://ipwho.is/',
-      'http://ip-api.com/json/?fields=status,message,country,countryCode,city,query,org,isp',
+      'https://freeipapi.com/api/json',
+      'https://ipapi.co/json/',
     ];
 
     let resultData = null;
@@ -232,10 +233,10 @@ async function getNetworkGeoInfo() {
 
     if (resultData) {
       return {
-        ip: resultData.ip || resultData.query || '127.0.0.1',
-        country: resultData.country || resultData.country_name || 'Локальная сеть',
+        ip: resultData.ip || resultData.ipAddress || resultData.query || '127.0.0.1',
+        country: resultData.country || resultData.country_name || resultData.countryName || 'Локальная сеть',
         countryCode: resultData.country_code || resultData.countryCode || 'UN',
-        city: resultData.city || '',
+        city: resultData.city || resultData.cityName || '',
         org: resultData.connection?.org || resultData.org || resultData.isp || '',
         mode,
       };

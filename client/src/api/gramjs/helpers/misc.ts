@@ -122,7 +122,7 @@ export function buildApiError(error: Error): Pick<ApiError, 'message' | 'code' |
   }
 
   return {
-    message: error.message,
+    message: error?.message || String(error),
   };
 }
 
@@ -156,7 +156,7 @@ export function wrapError<T extends Error>(error: T): WrappedError<T> {
   }
 
   if (!messageKey) {
-    if (error.message) {
+    if (error?.message) {
       messageKey = {
         key: 'ErrorUnexpectedMessage',
         variables: { error: error.message },

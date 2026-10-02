@@ -596,7 +596,7 @@ addActionHandler('apiUpdate', (global, actions, update): ActionReturnType => {
 
       const currentMessage = selectChatMessage(global, chatId, id);
 
-      if (message.reactions) {
+      if (message?.reactions) {
         global = updateReactions(
           global, actions, {
             chatId,
@@ -626,7 +626,7 @@ addActionHandler('apiUpdate', (global, actions, update): ActionReturnType => {
         }
 
         // If update contains the full message, store it
-        if (update.isFull) {
+        if (update.isFull && update.message) {
           global = addMessages(global, [update.message]);
         }
         setGlobal(global);

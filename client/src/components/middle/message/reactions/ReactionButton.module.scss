@@ -9,19 +9,31 @@
   z-index: 1;
 
   overflow: visible;
-  display: flex;
-  flex-direction: row;
-  gap: 0.125rem;
+  display: inline-flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 0.25rem;
 
   width: auto;
   height: 1.875rem;
-  padding: 0 0.375rem 0 0.25rem;
+  padding: 0 0.4375rem 0 0.3125rem;
+  border: 2px solid transparent !important;
   border-radius: 1.75rem;
+  box-sizing: border-box !important;
+  vertical-align: middle;
 
-  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro", "Roboto", "Helvetica Neue", sans-serif !important;
+  font-family:
+    -apple-system,
+    BlinkMacSystemFont,
+    "SF Pro Text",
+    "SF Pro",
+    "Roboto",
+    "Helvetica Neue",
+    sans-serif !important;
   font-weight: 400 !important;
   font-variant-numeric: tabular-nums;
-  line-height: 1.75rem;
+  line-height: 1;
   color: var(--reaction-text-color);
   text-transform: none;
   white-space: nowrap;
@@ -31,9 +43,19 @@
   transition: background-color 150ms, color 150ms, backdrop-filter 150ms, filter 150ms !important;
 
   &.chosen {
-    --reaction-background: var(--color-reaction-chosen);
-    --reaction-background-hover: var(--hover-color-reaction-chosen);
-    --reaction-text-color: var(--text-color-reaction-chosen);
+    --reaction-background: var(--color-primary) !important;
+    --reaction-background-hover: color-mix(in srgb, var(--color-primary) 85%, black) !important;
+    --reaction-text-color: #ffffff !important;
+    background-color: var(--color-primary) !important;
+    background: var(--color-primary) !important;
+    color: #ffffff !important;
+
+    border: 2px solid transparent !important;
+    box-shadow: none !important;
+
+    * {
+      color: #ffffff !important;
+    }
   }
 
   &.paid {
@@ -68,7 +90,10 @@
 }
 
 .animated-emoji {
-  margin: 0.25rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 0.125rem;
 }
 
 .tag.tag {
@@ -135,10 +160,20 @@
 }
 
 .counter {
+  display: inline-flex;
+  align-items: center;
+  line-height: 1;
   margin-inline-end: 0.125rem;
-  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro", "Roboto", "Helvetica Neue", sans-serif !important;
-  font-weight: 400 !important;
+  font-family:
+    -apple-system,
+    BlinkMacSystemFont,
+    "SF Pro Text",
+    "SF Pro",
+    "Roboto",
+    "Helvetica Neue",
+    sans-serif !important;
   font-size: 0.8125rem;
+  font-weight: 400 !important;
 }
 
 .disabled {

@@ -6,7 +6,6 @@ import { getActions, withGlobal } from '../../../global';
 import type { SharedSettings } from '../../../global/types';
 import type { ThemeKey, TimeFormat } from '../../../types';
 import type { IRadioOption } from '../../ui/RadioGroup';
-import { SettingsScreens } from '../../../types';
 
 import { selectSharedSettings } from '../../../global/selectors/sharedState';
 import {
@@ -21,7 +20,6 @@ import useLastCallback from '../../../hooks/useLastCallback';
 
 import Island, { IslandTitle } from '../../gili/layout/Island';
 import Checkbox from '../../ui/Checkbox';
-import ListItem from '../../ui/ListItem';
 import RadioGroup from '../../ui/RadioGroup';
 import RangeSlider from '../../ui/RangeSlider';
 
@@ -51,7 +49,7 @@ const SettingsGeneral = ({
   onReset,
 }: OwnProps & StateProps) => {
   const {
-    setSharedSettingOption, openSettingsScreen,
+    setSharedSettingOption,
   } = getActions();
 
   const lang = useLang();
@@ -134,13 +132,6 @@ const SettingsGeneral = ({
           value={messageTextSize}
           onChange={handleMessageTextSizeChange}
         />
-        <ListItem
-          icon="photo"
-          narrow
-          onClick={() => openSettingsScreen({ screen: SettingsScreens.GeneralChatBackground })}
-        >
-          {lang('ChatBackground')}
-        </ListItem>
       </Island>
 
       <IslandTitle dir={lang.isRtl ? 'rtl' : undefined}>{lang('Theme')}</IslandTitle>

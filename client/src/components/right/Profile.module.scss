@@ -1,10 +1,14 @@
 @use '../../styles/mixins';
 
 .root {
+  scrollbar-gutter: auto !important;
   overflow-x: hidden;
   display: flex;
   flex-direction: column;
   height: 100%;
+  padding-inline: 0 !important;
+  --surface-inline-padding: 0px 0px !important;
+  --surface-breakout-margin: 0px 0px !important;
 
   :global(.FloatingActionButton) {
     z-index: 3;
@@ -22,10 +26,17 @@
 }
 
 .profileInfo {
-  background-color: var(--color-background-secondary);
+  background-color: transparent;
 
   :global(.ProfileInfo) {
     --profile-info-bg: var(--color-background-secondary);
+
+    :global(.title),
+    :global(.title) *,
+    :global(.fullName),
+    :global(.fullName) * {
+      font-weight: 700 !important;
+    }
   }
 
   :global(.ChatInfo) {
@@ -39,10 +50,10 @@
 
 .chatExtraBlock,
 .linkedCommunityIsland {
-  margin: 1rem;
-  margin-bottom: 0;
-
-  @include mixins.adapt-margin-to-scrollbar(1rem);
+  margin: 1rem auto 0 auto !important;
+  width: calc(100% - 2rem) !important;
+  max-width: calc(100% - 2rem) !important;
+  box-sizing: border-box !important;
 }
 
 .chatExtraBlock {
@@ -71,9 +82,7 @@
   top: 1rem;
 
   margin-top: 1rem;
-  padding-inline: 1rem;
-
-  @include mixins.adapt-padding-to-scrollbar(1rem);
+  padding-inline: 1rem !important;
 
   &::before {
     pointer-events: none;
@@ -95,6 +104,12 @@
     :global(html.theme-dark) & {
       backdrop-filter: blur(1rem);
       mask-image: linear-gradient(to bottom, black 85%, transparent 100%);
+    }
+
+    :global(#Main.right-column-animating) & {
+      backdrop-filter: none !important;
+      -webkit-backdrop-filter: none !important;
+      mask-image: none !important;
     }
   }
 }
@@ -293,7 +308,7 @@
       margin-top: -1.8125rem;
       border-radius: var(--border-radius-default-small);
 
-      box-shadow: -1rem 0 1rem 1rem var(--color-background), -1rem 0 1rem 0.3125rem var(--color-background);
+      box-shadow: -1rem 0 1rem 1rem var(--color-background-secondary), -1rem 0 1rem 0.3125rem var(--color-background-secondary);
     }
 
     .moreSimilar {

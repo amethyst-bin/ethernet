@@ -759,7 +759,7 @@ const WebAppTab = ({
     }
 
     if (eventType === 'web_app_open_popup') {
-      if (popupParameters || !eventData.message.trim().length || !eventData.buttons?.length
+      if (popupParameters || !eventData.message?.trim().length || !eventData.buttons?.length
         || eventData.buttons.length > 3 || isRequestingPhone || isRequestingWriteAccess
         || unlockPopupsAt > Date.now()) {
         handleAppPopupClose(undefined);

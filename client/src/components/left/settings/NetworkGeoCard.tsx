@@ -4,7 +4,7 @@ import {
 } from '../../../lib/teact/teact';
 import buildClassName from '../../../util/buildClassName';
 import { getEthernetString } from '../../../util/ethernetLang';
-import useOldLang from '../../../hooks/useOldLang';
+import useLang from '../../../hooks/useLang';
 
 import Island from '../../gili/layout/Island';
 
@@ -32,18 +32,18 @@ function getCountryFlag(code?: string): string {
 }
 
 const NetworkGeoCard: FC<{ className?: string }> = ({ className }) => {
-  const lang = useOldLang();
-  const hermes = (window as any).hermesDesktop;
+  const lang = useLang();
+  const ethernet = (window as any).ethernetDesktop || (window as any).hermesDesktop;
 
   const [geoInfo, setGeoInfo] = useState<GeoNetworkInfo | null>(null);
   const [isRevealed, setIsRevealed] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
   const fetchGeoInfo = useCallback(async () => {
-    if (!hermes?.networkGeoInfo) return;
+    if (!ethernet?.networkGeoInfo) return;
     setIsLoading(true);
     try {
-      const data = await hermes.networkGeoInfo();
+      const data = await ethernet.networkGeoInfo();
       if (data) {
         setGeoInfo(data);
       }
@@ -52,7 +52,7 @@ const NetworkGeoCard: FC<{ className?: string }> = ({ className }) => {
     } finally {
       setIsLoading(false);
     }
-  }, [hermes]);
+  }, [ethernet]);
 
   useEffect(() => {
     fetchGeoInfo();

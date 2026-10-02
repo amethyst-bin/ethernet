@@ -152,8 +152,8 @@ const SettingsEthernetFunctions: FC<OwnProps> = ({ isActive, onReset }) => {
     }
   }, [activeSettings, ghostStorage, selectedAccountId]);
 
-  const toggleMaster = useCallback((e: React.MouseEvent) => {
-    e.stopPropagation();
+  const toggleMaster = useCallback((e?: React.MouseEvent) => {
+    e?.stopPropagation();
     updateSetting('enabled', !activeSettings.enabled);
   }, [activeSettings.enabled, updateSetting]);
 
@@ -189,8 +189,9 @@ const SettingsEthernetFunctions: FC<OwnProps> = ({ isActive, onReset }) => {
           <div className={styles.switcherWrapper}>
             <Switcher
               id="disable-ads-switch"
+              label={getEthernetString(lang, 'EthernetDisableAds')}
               checked={activeSettings.disableAds}
-              onChange={() => {}}
+              onCheck={(checked) => updateSetting('disableAds', checked)}
             />
           </div>
         </div>
@@ -203,8 +204,9 @@ const SettingsEthernetFunctions: FC<OwnProps> = ({ isActive, onReset }) => {
           <div className={styles.switcherWrapper}>
             <Switcher
               id="disable-all-notifications-switch"
+              label={getEthernetString(lang, 'EthernetDisableAllNotifications')}
               checked={Boolean(activeSettings.disableAllNotifications)}
-              onChange={() => {}}
+              onCheck={(checked) => updateSetting('disableAllNotifications', checked)}
             />
           </div>
         </div>
@@ -217,8 +219,9 @@ const SettingsEthernetFunctions: FC<OwnProps> = ({ isActive, onReset }) => {
           <div className={styles.switcherWrapper}>
             <Switcher
               id="disable-close-to-tray-switch"
+              label={getEthernetString(lang, 'EthernetDisableCloseToTray')}
               checked={Boolean(activeSettings.disableCloseToTray)}
-              onChange={() => {}}
+              onCheck={(checked) => updateSetting('disableCloseToTray', checked)}
             />
           </div>
         </div>
@@ -289,8 +292,9 @@ const SettingsEthernetFunctions: FC<OwnProps> = ({ isActive, onReset }) => {
             <div className={styles.switcherWrapper} onClick={toggleMaster}>
               <Switcher
                 id="ghost-master-switch"
+                label={getEthernetString(lang, 'GhostMode')}
                 checked={activeSettings.enabled}
-                onChange={() => {}}
+                onCheck={(checked) => updateSetting('enabled', checked)}
               />
             </div>
           </div>
@@ -365,8 +369,9 @@ const SettingsEthernetFunctions: FC<OwnProps> = ({ isActive, onReset }) => {
           <div className={styles.switcherWrapper}>
             <Switcher
               id="read-on-interact-switch"
+              label={getEthernetString(lang, 'GhostReadOnInteract')}
               checked={activeSettings.readOnInteract}
-              onChange={() => {}}
+              onCheck={(checked) => updateSetting('readOnInteract', checked)}
             />
           </div>
         </div>
@@ -382,8 +387,9 @@ const SettingsEthernetFunctions: FC<OwnProps> = ({ isActive, onReset }) => {
           <div className={styles.switcherWrapper}>
             <Switcher
               id="schedule-messages-switch"
+              label={getEthernetString(lang, 'GhostScheduleMessages')}
               checked={activeSettings.scheduleMessages}
-              onChange={() => {}}
+              onCheck={(checked) => updateSetting('scheduleMessages', checked)}
             />
           </div>
         </div>
@@ -448,8 +454,9 @@ const SettingsEthernetFunctions: FC<OwnProps> = ({ isActive, onReset }) => {
           <div className={styles.switcherWrapper}>
             <Switcher
               id="save-deleted-messages-switch"
+              label={getEthernetString(lang, 'SpySaveDeletedMessages')}
               checked={activeSettings.saveDeletedMessages}
-              onChange={() => {}}
+              onCheck={(checked) => updateSetting('saveDeletedMessages', checked)}
             />
           </div>
         </div>
@@ -462,8 +469,9 @@ const SettingsEthernetFunctions: FC<OwnProps> = ({ isActive, onReset }) => {
           <div className={styles.switcherWrapper}>
             <Switcher
               id="save-edits-history-switch"
+              label={getEthernetString(lang, 'SpySaveEditsHistory')}
               checked={activeSettings.saveEditsHistory}
-              onChange={() => {}}
+              onCheck={(checked) => updateSetting('saveEditsHistory', checked)}
             />
           </div>
         </div>
@@ -476,8 +484,9 @@ const SettingsEthernetFunctions: FC<OwnProps> = ({ isActive, onReset }) => {
           <div className={styles.switcherWrapper}>
             <Switcher
               id="save-in-bot-dialogs-switch"
+              label={getEthernetString(lang, 'SpySaveInBotDialogs')}
               checked={activeSettings.saveInBotDialogs}
-              onChange={() => {}}
+              onCheck={(checked) => updateSetting('saveInBotDialogs', checked)}
             />
           </div>
         </div>
@@ -499,8 +508,9 @@ const SettingsEthernetFunctions: FC<OwnProps> = ({ isActive, onReset }) => {
           <div className={styles.switcherWrapper}>
             <Switcher
               id="disable-nft-gifts-switch"
+              label={getEthernetString(lang, 'EthernetDisableNftGifts')}
               checked={Boolean(activeSettings.disableNftGifts)}
-              onChange={() => {}}
+              onCheck={(checked) => updateSetting('disableNftGifts', checked)}
             />
           </div>
         </div>

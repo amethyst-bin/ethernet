@@ -107,15 +107,19 @@
     margin: 0 !important;
     margin-block-start: 0.25rem !important;
     margin-block-end: 0.1875rem !important;
+    border-radius: var(--border-radius-messages-small) !important;
+    overflow: hidden !important;
 
     &,
     & img,
     & canvas,
+    & video,
     &.small-image img {
-      --border-top-left-radius: var(--border-radius-messages-small);
-      --border-top-right-radius: var(--border-radius-messages-small);
-      --border-bottom-left-radius: var(--border-radius-messages-small);
-      --border-bottom-right-radius: var(--border-radius-messages-small);
+      --border-top-left-radius: var(--border-radius-messages-small) !important;
+      --border-top-right-radius: var(--border-radius-messages-small) !important;
+      --border-bottom-left-radius: var(--border-radius-messages-small) !important;
+      --border-bottom-right-radius: var(--border-radius-messages-small) !important;
+      border-radius: var(--border-radius-messages-small) !important;
     }
 
     &.square-image {
@@ -123,12 +127,15 @@
       height: 100%;
       min-height: 0;
       margin-bottom: 0 !important;
+      border-radius: var(--border-radius-messages-small) !important;
 
       canvas,
-      img {
+      img,
+      video {
         width: 100% !important;
         height: 100% !important;
         object-fit: contain;
+        border-radius: var(--border-radius-messages-small) !important;
       }
     }
   }

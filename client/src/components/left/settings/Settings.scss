@@ -2,6 +2,43 @@
 
 #Settings {
   height: 100%;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+
+  .settings-content,
+  .Island,
+  .IslandTitle,
+  .ListItem,
+  .Radio,
+  .Radio-main,
+  .radio-group,
+  .Checkbox,
+  .label,
+  .subLabel {
+    user-select: none !important;
+    -webkit-user-select: none !important;
+
+    &::selection,
+    *::selection {
+      background: transparent !important;
+      color: inherit !important;
+    }
+  }
+
+  .Radio,
+  .Radio-main,
+  .Radio .label,
+  .Radio .subLabel {
+    background: transparent !important;
+    background-color: transparent !important;
+  }
+
+  input:not([type="radio"]):not([type="checkbox"]),
+  textarea,
+  .allow-selection {
+    user-select: text !important;
+    -webkit-user-select: text !important;
+  }
 
   .multiline-item .title-with-date {
     display: flex;
@@ -186,6 +223,8 @@
 
   &-header {
     position: relative;
+    user-select: none;
+    -webkit-user-select: none;
 
     padding-inline-start: 1rem;
 

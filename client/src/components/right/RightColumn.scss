@@ -92,66 +92,6 @@
       box-shadow: none;
     }
   }
-
-  &.is-profile-view {
-    position: absolute !important;
-    left: 0.5rem !important;
-    right: auto !important;
-    top: calc(50% + 0.25rem) !important;
-    bottom: 0.5rem !important;
-    height: calc(50% - 0.75rem) !important;
-    max-height: calc(50% - 0.75rem) !important;
-    width: var(--left-column-width, 33vw) !important;
-    min-width: var(--left-column-min-width, 16rem) !important;
-    max-width: var(--left-column-max-width, 26.5rem) !important;
-    border-radius: var(--border-radius-island) !important;
-    box-shadow: var(--shadow-island) !important;
-    transform: translate3d(0, 0, 0) !important;
-    z-index: 10 !important;
-    pointer-events: auto !important;
-    display: block !important;
-
-    #Main.folders-sidebar-visible & {
-      left: calc(var(--folders-sidebar-width, 5rem) + 1.5rem) !important;
-      max-width: calc(40vw - var(--folders-sidebar-width, 5rem)) !important;
-    }
-
-    @media (min-width: 1276px) {
-      width: var(--left-column-width, 25vw) !important;
-
-      #Main.folders-sidebar-visible & {
-        max-width: calc(33vw - var(--folders-sidebar-width, 5rem)) !important;
-      }
-    }
-
-    @media (max-width: 925px) {
-      position: fixed !important;
-      left: 0.5rem !important;
-      right: auto !important;
-      top: calc(50% + 0.25rem) !important;
-      bottom: 0.5rem !important;
-      height: calc(50% - 0.75rem) !important;
-      max-height: calc(50% - 0.75rem) !important;
-      width: calc(100vw - 1rem) !important;
-      max-width: calc(100vw - 1rem) !important;
-      border-radius: var(--border-radius-island) !important;
-      transform: translate3d(0, 0, 0) !important;
-    }
-
-    @media (max-width: 600px) {
-      position: fixed !important;
-      left: 0.5rem !important;
-      right: auto !important;
-      top: calc(50% + 0.25rem) !important;
-      bottom: 0.5rem !important;
-      height: calc(50% - 0.75rem) !important;
-      max-height: calc(50% - 0.75rem) !important;
-      width: calc(100vw - 1rem) !important;
-      max-width: calc(100vw - 1rem) !important;
-      border-radius: var(--border-radius-island) !important;
-      transform: translate3d(0, 0, 0) !important;
-    }
-  }
 }
 
 #RightColumn-wrapper {
@@ -231,64 +171,73 @@
   }
 }
 
-#Main #RightColumn-wrapper #RightColumn.is-profile-view,
-#Main #RightColumn.is-profile-view {
+#Main.right-column-shown #RightColumn-wrapper #RightColumn.is-profile-view,
+#Main.right-column-open #RightColumn-wrapper #RightColumn.is-profile-view,
+#Main.right-column-shown #RightColumn.is-profile-view,
+#Main.right-column-open #RightColumn.is-profile-view {
   position: absolute !important;
-  left: 0.5rem !important;
-  right: auto !important;
-  top: calc(50% + 0.25rem) !important;
+  top: 0.5rem !important;
   bottom: 0.5rem !important;
-  height: calc(50% - 0.75rem) !important;
-  max-height: calc(50% - 0.75rem) !important;
-  width: var(--left-column-width, 33vw) !important;
-  min-width: var(--left-column-min-width, 16rem) !important;
-  max-width: var(--left-column-max-width, 26.5rem) !important;
+  right: 0.5rem !important;
+  left: auto !important;
+  width: var(--custom-right-column-width, 25.5rem) !important;
+  max-width: var(--custom-right-column-width, 25.5rem) !important;
+  min-width: 22rem !important;
+  height: calc(100% - 1rem) !important;
+  max-height: calc(100% - 1rem) !important;
   border-radius: var(--border-radius-island) !important;
   box-shadow: var(--shadow-island) !important;
-  transform: translate3d(0, 0, 0) !important;
-  z-index: 10 !important;
+  z-index: 25 !important;
   pointer-events: auto !important;
   display: block !important;
-
-  @media (min-width: 1276px) {
-    width: var(--left-column-width, 25vw) !important;
-  }
-
-  @media (max-width: 925px) {
-    position: fixed !important;
-    left: 0.5rem !important;
-    right: auto !important;
-    top: calc(50% + 0.25rem) !important;
-    bottom: 0.5rem !important;
-    height: calc(50% - 0.75rem) !important;
-    max-height: calc(50% - 0.75rem) !important;
-    width: calc(100vw - 1rem) !important;
-    max-width: calc(100vw - 1rem) !important;
-    border-radius: var(--border-radius-island) !important;
-    transform: translate3d(0, 0, 0) !important;
-  }
-
-  @media (max-width: 600px) {
-    position: fixed !important;
-    left: 0.5rem !important;
-    right: auto !important;
-    top: calc(50% + 0.25rem) !important;
-    bottom: 0.5rem !important;
-    height: calc(50% - 0.75rem) !important;
-    max-height: calc(50% - 0.75rem) !important;
-    width: calc(100vw - 1rem) !important;
-    max-width: calc(100vw - 1rem) !important;
-    border-radius: var(--border-radius-island) !important;
-    transform: translate3d(0, 0, 0) !important;
-  }
+  visibility: visible !important;
+  background-color: var(--color-background-secondary) !important;
+  background: var(--color-background-secondary) !important;
+  overflow: hidden !important;
+  will-change: transform !important;
+  contain: layout paint !important;
+  backface-visibility: hidden !important;
+  transition: transform var(--layer-transition, 300ms cubic-bezier(0.33, 1, 0.68, 1)) !important;
 }
 
-#Main.folders-sidebar-visible #RightColumn-wrapper #RightColumn.is-profile-view,
-#Main.folders-sidebar-visible #RightColumn.is-profile-view {
-  left: calc(var(--folders-sidebar-width, 5rem) + 1.5rem) !important;
-  max-width: calc(40vw - var(--folders-sidebar-width, 5rem)) !important;
+#Main.right-column-open #RightColumn-wrapper #RightColumn.is-profile-view,
+#Main.right-column-open #RightColumn.is-profile-view {
+  transform: translate3d(0, 0, 0) !important;
+  pointer-events: auto !important;
+}
 
-  @media (min-width: 1276px) {
-    max-width: calc(33vw - var(--folders-sidebar-width, 5rem)) !important;
+#Main:not(.right-column-open) #RightColumn-wrapper #RightColumn.is-profile-view,
+#Main:not(.right-column-open) #RightColumn.is-profile-view {
+  transform: translate3d(calc(100% + 1.5rem), 0, 0) !important;
+  pointer-events: none !important;
+}
+
+#Main:not(.right-column-shown) #RightColumn-wrapper #RightColumn.is-profile-view,
+#Main:not(.right-column-shown) #RightColumn.is-profile-view {
+  display: none !important;
+  pointer-events: none !important;
+  visibility: hidden !important;
+}
+
+#RightColumn.opens-left,
+#RightColumn[data-side="left"],
+html[data-profile-position="left"] #RightColumn {
+  right: auto !important;
+  left: 0.5rem !important;
+}
+
+#Main:not(.right-column-open) #RightColumn-wrapper #RightColumn.is-profile-view.opens-left,
+#Main:not(.right-column-open) #RightColumn-wrapper #RightColumn.is-profile-view[data-side="left"],
+#Main:not(.right-column-open) #RightColumn.is-profile-view.opens-left,
+#Main:not(.right-column-open) #RightColumn.is-profile-view[data-side="left"],
+html[data-profile-position="left"] #Main:not(.right-column-open) #RightColumn {
+  transform: translate3d(calc(-100% - 1.5rem), 0, 0) !important;
+  pointer-events: none !important;
+}
+
+#Main.right-column-animating {
+  #RightColumn.is-profile-view,
+  #RightColumn {
+    box-shadow: none !important;
   }
 }

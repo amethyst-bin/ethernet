@@ -46,7 +46,6 @@ const FloatingActionButtons = ({
 }: OwnProps & StateProps) => {
   const {
     focusNextPollVote,
-    focusNextReply,
     focusNextReaction,
     focusNextMention,
     loadUnreadPollVotes,
@@ -112,10 +111,14 @@ const FloatingActionButtons = ({
       return;
     }
 
-    if (messageListType === 'thread') {
-      focusNextReply();
-    } else {
-      scrollMessageListToBottom();
+    scrollMessageListToBottom();
+
+    const container = document.querySelector<HTMLElement>('#MiddleColumn .MessageList');
+    if (container) {
+      container.scrollTo({
+        top: container.scrollHeight,
+        behavior: 'smooth',
+      });
     }
   });
 

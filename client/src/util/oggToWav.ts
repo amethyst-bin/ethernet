@@ -31,7 +31,7 @@ export async function oggToWav(opusData: Blob): Promise<Blob> {
     };
 
     wavWorker.onmessage = (e) => {
-      if (e.data.message === 'page') {
+      if (e.data?.message === 'page') {
         resolve(new Blob([e.data.page], { type: 'audio/wav' }));
 
         decoderWorker!.terminate();

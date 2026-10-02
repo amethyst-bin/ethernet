@@ -1740,7 +1740,7 @@ addActionHandler('forceMarkMessageListRead', (global, actions, payload): ActionR
   }
   global = replaceThreadReadStateParam(global, chatId, threadId, 'lastReadInboxMessageId', maxId);
 
-  actions.showNotification({ message: 'Сообщение помечено как прочитанное' });
+  actions.showNotification({ message: 'Сообщение помечено как прочитанное', tabId });
   return global;
 });
 

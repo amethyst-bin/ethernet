@@ -17,8 +17,13 @@
     "dist:exe": "npm run app:build && npx -y electron-builder --win portable",
     "dist:win64": "npx -y electron-builder --win portable --x64",
     "dist:win32": "npx -y electron-builder --win portable --ia32",
+    "dist:win:portable": "npm run app:build && npx -y electron-builder --win portable --x64",
+    "dist:win:installer": "npm run app:build && npx -y electron-builder --win nsis --x64",
+    "dist:win:all": "npm run app:build && npx -y electron-builder --win portable nsis --x64",
     "dist:linux": "npx -y electron-builder --linux dir --x64",
-    "dist:all": "npm run dist:win64 && npm run dist:win32 && npm run dist:linux",
+    "dist:linux:portable": "npx -y electron-builder --linux tar.gz --x64",
+    "dist:linux:appimage": "npx -y electron-builder --linux AppImage --x64",
+    "dist:all": "npm run dist:win:all && npm run dist:linux:portable",
     "app": "electron .",
     "dev:mocked": "cross-env APP_ENV=test APP_MOCKED_CLIENT=1 vite --mode development --port 1235",
     "build:dev": "vite build --mode development",
@@ -180,6 +185,7 @@
     "files": [
       "dist/**/*",
       "electron/**/*",
+      "assets-bundle/**/*",
       "package.json",
       "ethernet.ico"
     ],
@@ -192,15 +198,51 @@
         ]
       }
     ],
+    "extraFiles": [
+      {
+        "from": "assets-bundle/themes",
+        "to": "themes",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": "assets-bundle/wallpapers",
+        "to": "wallpapers",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": "assets-bundle/plugins",
+        "to": "plugins",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": "assets-bundle/ethernet-settings.json",
+        "to": "ethernet-settings.json"
+      }
+    ],
     "win": {
-      "target": "portable",
       "icon": "ethernet.ico",
       "legalTrademarks": "ethernet"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Ethernet",
+      "artifactName": "Ethernet-Windows-Setup-${arch}.exe"
+    },
+    "portable": {
+      "artifactName": "Ethernet-Windows-Portable-${arch}.exe"
     },
     "linux": {
       "executableName": "Ethernet",
       "target": [
-        "appImage",
         "tar.gz",
         "dir"
       ],
@@ -213,11 +255,33 @@
           "filter": [
             "*"
           ]
+        },
+        {
+          "from": "assets-bundle/themes",
+          "to": "themes",
+          "filter": [
+            "**/*"
+          ]
+        },
+        {
+          "from": "assets-bundle/wallpapers",
+          "to": "wallpapers",
+          "filter": [
+            "**/*"
+          ]
+        },
+        {
+          "from": "assets-bundle/plugins",
+          "to": "plugins",
+          "filter": [
+            "**/*"
+          ]
+        },
+        {
+          "from": "assets-bundle/ethernet-settings.json",
+          "to": "ethernet-settings.json"
         }
       ]
-    },
-    "portable": {
-      "artifactName": "Ethernet-Windows-${arch}.exe"
     },
     "appImage": {
       "artifactName": "Ethernet-Linux-${arch}.AppImage"

@@ -8,21 +8,79 @@ const { app } = require('electron');
 
 const isPackaged = app ? app.isPackaged : false;
 const ROOT = process.env.PORTABLE_EXECUTABLE_DIR || (process.env.APPIMAGE ? path.dirname(process.env.APPIMAGE) : (isPackaged ? path.dirname(process.execPath) : path.join(__dirname, '..', '..')));
-const SETTINGS_PATH = path.join(ROOT, 'ethernet-settings.json');
+
+function getWritableSettingsPath() {
+  const rootSettingsPath = path.join(ROOT, 'ethernet-settings.json');
+  if (process.env.PORTABLE_EXECUTABLE_DIR) {
+    return rootSettingsPath;
+  }
+  try {
+    if (fs.existsSync(rootSettingsPath)) {
+      fs.accessSync(rootSettingsPath, fs.constants.R_OK | fs.constants.W_OK);
+      return rootSettingsPath;
+    }
+  } catch {}
+
+  try {
+    const testFile = path.join(ROOT, `.test-write-${Date.now()}.tmp`);
+    fs.writeFileSync(testFile, 'test');
+    fs.unlinkSync(testFile);
+    return rootSettingsPath;
+  } catch {}
+
+  if (app && typeof app.getPath === 'function') {
+    const userDataPath = app.getPath('userData');
+    if (!fs.existsSync(userDataPath)) {
+      try { fs.mkdirSync(userDataPath, { recursive: true }); } catch {}
+    }
+    return path.join(userDataPath, 'ethernet-settings.json');
+  }
+
+  return rootSettingsPath;
+}
+
+const SETTINGS_PATH = getWritableSettingsPath();
 
 function read() {
   try {
-    return JSON.parse(fs.readFileSync(SETTINGS_PATH, 'utf8'));
-  } catch {
-    return { enabledPlugins: [], theme: null };
-  }
+    if (fs.existsSync(SETTINGS_PATH)) {
+      return JSON.parse(fs.readFileSync(SETTINGS_PATH, 'utf8'));
+    }
+  } catch {}
+
+  try {
+    const rootPath = path.join(ROOT, 'ethernet-settings.json');
+    if (fs.existsSync(rootPath)) {
+      return JSON.parse(fs.readFileSync(rootPath, 'utf8'));
+    }
+  } catch {}
+
+  try {
+    if (app && typeof app.getPath === 'function') {
+      const userPath = path.join(app.getPath('userData'), 'ethernet-settings.json');
+      if (fs.existsSync(userPath)) {
+        return JSON.parse(fs.readFileSync(userPath, 'utf8'));
+      }
+    }
+  } catch {}
+
+  return { enabledPlugins: [], theme: null };
 }
 
 function write(settings) {
+  const content = JSON.stringify(settings, null, 2);
   try {
-    fs.writeFileSync(SETTINGS_PATH, JSON.stringify(settings, null, 2), 'utf8');
+    fs.writeFileSync(SETTINGS_PATH, content, 'utf8');
   } catch (err) {
     console.error('[ethernet-settings] write error:', err);
+    if (app && typeof app.getPath === 'function') {
+      try {
+        const userPath = path.join(app.getPath('userData'), 'ethernet-settings.json');
+        fs.writeFileSync(userPath, content, 'utf8');
+      } catch (err2) {
+        console.error('[ethernet-settings] fallback write error:', err2);
+      }
+    }
   }
 }
 
@@ -42,6 +100,8 @@ module.exports = {
     const newTheme = theme || 'default';
     if (s.themeMods[newTheme]) {
       s.mod = { ...s.themeMods[newTheme] };
+    } else {
+      s.mod = {};
     }
     write(s);
   },
@@ -49,17 +109,41 @@ module.exports = {
   getMod: (themeName) => {
     const s = read();
     const t = themeName || s.theme || 'default';
-    if (s.themeMods && s.themeMods[t]) {
+    if (s.themeMods && s.themeMods[t] && Object.keys(s.themeMods[t]).length > 0) {
       return s.themeMods[t];
     }
-    return s.mod || null;
+    if (s.mod && Object.keys(s.mod).length > 0) {
+      return s.mod;
+    }
+    return {
+      colors: {
+        '--color-background': '#16171a',
+        '--color-background-secondary': '#212328',
+        '--color-background-secondary-accent': '#292c33',
+        '--color-background-sidebar': '#1a1b1f',
+        '--color-background-selected': '#2a2e37',
+        '--color-borders': '#2a2d34',
+        '--color-dividers': '#24272e',
+        '--color-text': '#f3f4f6',
+        '--color-links': '#58a6ff',
+        '--color-text-secondary': '#9da7b7',
+        '--color-primary': '#3b82f6',
+        '--color-icon-buttons': '#9da7b7',
+        '--color-text-meta-colored': '#58a6ff',
+        '--color-background-own': '#1e3a5f',
+        '--color-chat-active': '#2b3d58',
+      },
+      radii: { ui: 16, messages: 16, buttons: 12, avatars: 50 },
+    };
   },
   setMod: (mod, themeName) => {
     const s = read();
     const t = themeName || s.theme || 'default';
     s.themeMods = s.themeMods || {};
-    s.themeMods[t] = { ...(s.themeMods[t] || s.mod || {}), ...mod };
-    s.mod = { ...(s.mod || {}), ...mod };
+    s.themeMods[t] = { ...(s.themeMods[t] || {}), ...mod };
+    if (!themeName || themeName === (s.theme || 'default')) {
+      s.mod = { ...s.themeMods[t] };
+    }
     write(s);
     return s.themeMods[t];
   },

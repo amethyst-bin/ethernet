@@ -64,7 +64,7 @@
 
     width: fit-content;
 
-    background-color: var(--color-primary-opacity);
+    background-color: color-mix(in srgb, var(--color-primary) 24%, var(--color-background, #16171a));
 
     transition: clip-path var(--slide-transition);
 

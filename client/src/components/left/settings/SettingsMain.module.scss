@@ -18,6 +18,14 @@
   :global(.ProfileInfo) {
     margin: -1rem 0 0.75rem -1rem;
     margin-inline-end: calc(min(var(--scrollbar-width) - 1rem, 0px));
+
+    /* Убираем цветной фон профиля в настройках */
+    --profile-info-bg: transparent;
+    background-color: transparent !important;
+
+    :global(.ProfileInfo) {
+      background-color: transparent !important;
+    }
   }
 }
 

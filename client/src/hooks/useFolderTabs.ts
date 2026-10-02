@@ -14,6 +14,7 @@ import { SettingsScreens } from '../types';
 
 import { ALL_FOLDER_ID } from '../config';
 import { selectCanShareFolder } from '../global/selectors';
+import { folderIconMap } from '../util/folderIconMap';
 import { MEMO_EMPTY_ARRAY } from '../util/memo';
 import { renderTextWithEntities } from '../components/common/helpers/renderTextWithEntities';
 import useAppLayout from './useAppLayout';
@@ -226,6 +227,25 @@ const useFolderTabs = (params: Params) => {
             ...entity,
             offset: entity.offset - length,
           }));
+        } else if (!folderIcon && title.text) {
+          for (const emoji of Object.keys(folderIconMap)) {
+            if (title.text.startsWith(emoji)) {
+              folderIcon = emoji;
+              const remainingText = title.text.slice(emoji.length).trim();
+              if (remainingText) {
+                folderNameOptions.text = remainingText;
+                if (title.entities) {
+                  folderNameOptions.entities = title.entities
+                    .filter((entity) => entity.offset >= emoji.length)
+                    .map((entity) => ({
+                      ...entity,
+                      offset: entity.offset - emoji.length,
+                    }));
+                }
+              }
+              break;
+            }
+          }
         }
       }
 

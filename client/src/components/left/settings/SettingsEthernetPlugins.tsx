@@ -395,6 +395,7 @@ const SettingsEthernetPlugins: FC<OwnProps> = ({ isActive, onReset }) => {
       <Modal
         isOpen={editing !== undefined}
         onClose={() => setEditing(undefined)}
+        className={styles.editorModalRoot}
         title={editing?.id ? `${getEthernetString(lang, 'EthernetEditPlugin')}: ${editing.name}` : getEthernetString(lang, 'EthernetNewPlugin')}
       >
         {editing && (

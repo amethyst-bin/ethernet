@@ -33,7 +33,7 @@ const ChatFolderTabList = ({
   });
 
   return (
-    <div className={buildClassName(styles.root)}>
+    <div className={styles.root}>
       <TabList
         tabs={tabs}
         activeTab={activeTab}

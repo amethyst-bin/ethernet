@@ -32,6 +32,8 @@ type OwnProps = {
   icon?: string | ApiMessageEntityCustomEmoji;
   clickArg?: number;
   onClick?: (arg: number) => void;
+  onMouseEnter?: (element: HTMLDivElement) => void;
+  onMouseLeave?: () => void;
 };
 
 const Folder = ({
@@ -46,9 +48,24 @@ const Folder = ({
   icon,
   clickArg,
   onClick,
+  onMouseEnter,
+  onMouseLeave,
 }: OwnProps) => {
   const folderRef = useRef<HTMLDivElement>();
   const [isHovering, markHovering, unmarkHovering] = useFlag();
+
+  const handleMouseEnter = useLastCallback(() => {
+    markHovering();
+    const folderEl = folderRef.current;
+    if (folderEl) {
+      onMouseEnter?.(folderEl);
+    }
+  });
+
+  const handleMouseLeave = useLastCallback(() => {
+    unmarkHovering();
+    onMouseLeave?.();
+  });
 
   const {
     contextMenuAnchor, handleContextMenu, handleBeforeContextMenu, handleContextMenuClose,
@@ -82,18 +99,20 @@ const Folder = ({
       onClick={handleClick}
       onMouseDown={handleMouseDown}
       onContextMenu={handleContextMenu}
-      onMouseEnter={markHovering}
-      onMouseLeave={unmarkHovering}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
       ref={folderRef}
     >
-      <div className={styles.icon}>
-        <FolderIcon
-          emoji={typeof icon === 'string' ? icon : undefined}
-          customEmojiId={typeof icon === 'object' ? icon.documentId : undefined}
-          shouldAnimate={isHovering}
-        />
+      <div className={styles.iconWrapper}>
+        <div className={styles.icon}>
+          <FolderIcon
+            emoji={typeof icon === 'string' ? icon : undefined}
+            customEmojiId={typeof icon === 'object' ? icon.documentId : undefined}
+            shouldAnimate={isHovering}
+          />
+        </div>
         {Boolean(badgeCount) && (
-          <span className={buildClassName(styles.badge, isBadgeActive && styles.badgeActive)}>{badgeCount}</span>
+          <span className={buildClassName(styles.badge, (isActive || isBadgeActive) && styles.badgeActive)} />
         )}
       </div>
       <span className={styles.inner}>

@@ -596,7 +596,7 @@ function MiddleColumn({
             />
             <Transition
               name={resolveTransitionName(
-                'slideFade',
+                'slide',
                 animationLevel,
                 shouldSkipHistoryAnimations || !withInterfaceAnimations,
               )}

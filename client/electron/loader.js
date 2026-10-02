@@ -154,6 +154,9 @@
           }
         } else if (key === '--border-radius-ui') {
           mod.radii.ui = parseInt(rawVal, 10) || 16;
+        } else if (key === '--border-radius-folders-sidebar') {
+          const parsed = parseFloat(rawVal);
+          mod.radii.foldersSidebar = rawVal.endsWith('rem') ? Math.round(parsed * 16) : Math.round(parsed);
         } else if (key === '--border-radius-messages') {
           mod.radii.messages = parseInt(rawVal, 10) || 15;
         } else if (key === '--border-radius-buttons') {
@@ -184,12 +187,26 @@
           mod.messageAlignOther = rawVal;
         }
       }
+
+      // Сохраняем пользовательские CSS-правила вне блока :root
+      const rootMatch = css.match(/:root\s*\{([^}]*)\}/);
+      if (rootMatch) {
+        const customPart = css.replace(rootMatch[0], '').trim();
+        if (customPart) {
+          mod.customCss = customPart;
+        }
+      } else if (css.trim()) {
+        mod.customCss = css.trim();
+      }
+
       return mod;
     },
-    // Живое применение темы (name без .css)
     async applyTheme(name) {
       if (!name) return;
       window.__ethernetActiveTheme = name;
+      try {
+        localStorage.setItem('ethernet_active_theme', name);
+      } catch {}
 
       // 1. Получаем полный CSS темы
       let cssText = '';
@@ -210,6 +227,9 @@
       if (!styleEl) {
         styleEl = document.createElement('style');
         styleEl.id = 'ethernet-active-theme-style';
+        document.head.appendChild(styleEl);
+      } else {
+        // Убедимся, что ethernet-active-theme-style всегда находится в конце head для приоритета пользовательского CSS
         document.head.appendChild(styleEl);
       }
       styleEl.textContent = importantCss;
@@ -273,6 +293,10 @@
       window.__ethernetActiveTheme = null;
 
       try {
+        localStorage.removeItem('ethernet_active_theme');
+      } catch {}
+
+      try {
         const modRes = await fetch('/ethernet/mod.json');
         if (modRes.ok) {
           const mod = await modRes.json();
@@ -316,24 +340,47 @@
   document.addEventListener('keydown', (e) => api.emit('keydown', { key: e.key, ctrl: e.ctrlKey, shift: e.shiftKey, alt: e.altKey }));
 
   // 3. Загрузка и немедленное применение темы и настроек мода при старте
-  function loadAndApplyAll() {
+  async function loadAndApplyAll() {
     ensureActiveWallpaper();
-    fetch('/ethernet/config.json')
-      .then((r) => r.json())
-      .then((cfg) => {
-        if (cfg && cfg.theme) api.applyTheme(cfg.theme);
-      })
-      .catch(() => { });
+    let themeToApply = null;
 
-    fetch('/ethernet/mod.json')
-      .then((r) => r.json())
-      .then((mod) => {
-        if (mod) {
-          window.__ethernetMod = mod;
-          applyModSettings(mod);
+    try {
+      const cfgRes = await fetch('/ethernet/config.json');
+      if (cfgRes.ok) {
+        const cfg = await cfgRes.json();
+        if (cfg && cfg.theme) {
+          themeToApply = cfg.theme;
         }
-      })
-      .catch(() => { });
+      }
+    } catch {}
+
+    if (!themeToApply) {
+      try {
+        const cachedTheme = localStorage.getItem('ethernet_active_theme');
+        if (cachedTheme) {
+          themeToApply = cachedTheme;
+          const desktop = window.ethernetDesktop || window.hermesDesktop;
+          if (desktop?.themeActivate) {
+            desktop.themeActivate(cachedTheme).catch(() => {});
+          }
+        }
+      } catch {}
+    }
+
+    if (themeToApply) {
+      await api.applyTheme(themeToApply);
+    } else {
+      try {
+        const modRes = await fetch('/ethernet/mod.json');
+        if (modRes.ok) {
+          const mod = await modRes.json();
+          if (mod) {
+            window.__ethernetMod = mod;
+            applyModSettings(mod);
+          }
+        }
+      } catch {}
+    }
   }
 
   // 4. Загрузка активных плагинов
@@ -451,15 +498,19 @@
   setTimeout(loadAndApplyAll, 300);
   setTimeout(loadAndApplyAll, 1200);
 
-  // Следим за сменой light/dark
+  // Следим за сменой light/dark без периодических таймеров
   let lastClientTheme = document.documentElement.className.match(/theme-(light|dark)/)?.[1];
-  setInterval(() => {
+  const themeObserver = new MutationObserver(() => {
     const cur = document.documentElement.className.match(/theme-(light|dark)/)?.[1];
     if (cur !== lastClientTheme) {
       lastClientTheme = cur;
       if (window.__ethernetActiveTheme) api.applyTheme(window.__ethernetActiveTheme);
     }
-  }, 500);
+  });
+  themeObserver.observe(document.documentElement, {
+    attributes: true,
+    attributeFilter: ['class'],
+  });
 
   let modStyleEl = null;
 
@@ -467,7 +518,12 @@
     if (!modStyleEl) {
       modStyleEl = document.createElement('style');
       modStyleEl.id = 'ethernet-mod-style';
-      document.head.appendChild(modStyleEl);
+      const activeThemeStyle = document.getElementById('ethernet-active-theme-style');
+      if (activeThemeStyle && activeThemeStyle.parentNode) {
+        activeThemeStyle.parentNode.insertBefore(modStyleEl, activeThemeStyle);
+      } else {
+        document.head.appendChild(modStyleEl);
+      }
     }
     return modStyleEl;
   }
@@ -477,18 +533,25 @@
     mod = mod || {};
     document.documentElement.setAttribute('data-message-align-own', mod.messageAlignOwn || 'right');
     document.documentElement.setAttribute('data-message-align-other', mod.messageAlignOther || 'left');
+    document.documentElement.setAttribute('data-chat-width', mod.chatWidth || 'wide');
     const css = [];
 
     // --- Шрифт (нативная системная типографика без размытия) ---
     css.push(`
       :root {
-        --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif !important;
+        --font-family: "SF Pro Text", "SF Pro Display", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif !important;
         --font-family-monospace: ui-monospace, "SF Mono", "Menlo", Monaco, Consolas, monospace !important;
         --font-weight-normal: 400 !important;
         --font-weight-medium: 500 !important;
         --font-weight-semibold: 600 !important;
         --font-weight-bold: 700 !important;
         --font-weight-black: 800 !important;
+      }
+
+      html, body, #root, #Main {
+        -webkit-font-smoothing: antialiased !important;
+        -moz-osx-font-smoothing: grayscale !important;
+        text-rendering: optimizeLegibility !important;
       }
 
       body, input, textarea, select, .message-content, .text-content, .Message,
@@ -504,7 +567,26 @@
       b, strong, .bold, .modal-title, .chat-info-wrapper .title, .user-name,
       .ListItem .title, .ChatInfo .title {
         font-family: var(--font-family) !important;
-        font-weight: 500 !important;
+        font-weight: 600 !important;
+        -webkit-font-smoothing: antialiased !important;
+        -moz-osx-font-smoothing: grayscale !important;
+      }
+
+      /* Имя в профиле (само название) — строго жирный шрифт 700 */
+      #RightColumn .ProfileInfo .fullName,
+      #RightColumn .ProfileInfo .fullName *,
+      #RightColumn .ProfileInfo .title,
+      #RightColumn .ProfileInfo .title *,
+      #RightColumn .ProfileInfo h3,
+      #RightColumn .ProfileInfo h3 *,
+      .ProfileInfo .fullName,
+      .ProfileInfo .fullName *,
+      .ProfileInfo .title,
+      .ProfileInfo .title *,
+      .ProfileInfo h3,
+      .ProfileInfo h3 * {
+        font-family: var(--font-family) !important;
+        font-weight: 700 !important;
       }
 
       /* Аватары без фото (буквы и инициалы) */
@@ -535,22 +617,46 @@
       ];
     }
 
-    if (hasColors) {
-      for (const [k, v] of Object.entries(mod.colors)) {
-        const cleanVal = (v || '').replace(/\s*!important/g, '').trim();
-        if (cleanVal && /^#[0-9a-fA-F]{6}$/.test(cleanVal)) htmlStyle.setProperty(k, cleanVal, 'important');
-      }
-      window.__ethernetPrevColors = { ...mod.colors };
-    } else if (window.__ethernetPrevColors) {
-      for (const k of Object.keys(window.__ethernetPrevColors)) {
-        htmlStyle.removeProperty(k);
-      }
-      window.__ethernetPrevColors = null;
-    }
+    const DEFAULT_ETH_COLORS = {
+      '--color-background': '#16171a',
+      '--color-background-secondary': '#212328',
+      '--color-background-secondary-accent': '#292c33',
+      '--color-background-sidebar': '#1a1b1f',
+      '--color-background-selected': '#2a2e37',
+      '--color-borders': '#2a2d34',
+      '--color-dividers': '#24272e',
+      '--color-text': '#f3f4f6',
+      '--color-links': '#58a6ff',
+      '--color-text-secondary': '#9da7b7',
+      '--color-primary': '#3b82f6',
+      '--color-icon-buttons': '#9da7b7',
+      '--color-text-meta-colored': '#58a6ff',
+      '--color-background-own': '#1e3a5f',
+      '--color-chat-active': '#2b3d58',
+    };
 
-    const primaryRaw = (hasColors && mod.colors['--color-primary']) || '#8742e0';
+    const colorsToApply = (hasColors && Object.keys(mod.colors).length > 0)
+      ? { ...DEFAULT_ETH_COLORS, ...mod.colors }
+      : DEFAULT_ETH_COLORS;
+
+    if (window.__ethernetPrevColors) {
+      for (const k of Object.keys(window.__ethernetPrevColors)) {
+        if (!(k in colorsToApply)) {
+          htmlStyle.removeProperty(k);
+        }
+      }
+    }
+    for (const [k, v] of Object.entries(colorsToApply)) {
+      const cleanVal = (v || '').replace(/\s*!important/g, '').trim();
+      if (cleanVal && (/^#[0-9a-fA-F]{3,8}$/.test(cleanVal) || cleanVal.startsWith('rgb') || cleanVal.startsWith('hsl'))) {
+        htmlStyle.setProperty(k, cleanVal, 'important');
+      }
+    }
+    window.__ethernetPrevColors = { ...colorsToApply };
+
+    const primaryRaw = colorsToApply['--color-primary'] || '#3b82f6';
     const primaryHex = primaryRaw.replace(/\s*!important/g, '').trim();
-    const linksColor = hasColors && mod.colors['--color-links'];
+    const linksColor = colorsToApply['--color-links'];
 
     // Плавность смены цветов
     css.push(`
@@ -609,8 +715,8 @@
           --color-voice-transcribe-button-own: color-mix(in srgb, ${primaryHex} 35%, transparent) !important;
           --color-message-reaction-chosen: ${primaryHex} !important;
           --color-message-reaction-chosen-hover: color-mix(in srgb, ${primaryHex} 85%, black) !important;
-          --color-message-reaction-own: color-mix(in srgb, ${primaryHex} 30%, transparent) !important;
-          --color-message-reaction-hover-own: color-mix(in srgb, ${primaryHex} 45%, transparent) !important;
+          --color-message-reaction-own: rgba(0, 0, 0, 0.08) !important;
+          --color-message-reaction-hover-own: rgba(0, 0, 0, 0.14) !important;
           --color-interactive-active: ${primaryHex} !important;
           --color-telegram-blue: ${primaryHex} !important;
           --accent-color: ${primaryHex} !important;
@@ -667,30 +773,35 @@
           color: var(--color-text-meta-colored, ${primaryHex}) !important;
         }
 
-        /* Чекбоксы, свитчеры, радиокнопки, слайдеры */
-        .Checkbox.checkbox-input input:checked + .Checkbox-main,
-        .Checkbox-main.is-checked,
-        .Switcher input:checked + .Switcher-main,
-        .Switcher-main.is-checked,
-        .Radio-main.is-checked,
+        /* Радиокнопки и чекбоксы: текст всегда прозрачный без паразитных фонов */
+        .Radio-main,
+        .Radio-main *,
         .Radio input:checked + .Radio-main,
+        .Radio input:checked ~ .Radio-main {
+          background-color: transparent !important;
+          background: transparent !important;
+        }
+
+        /* Слайдеры */
         .RangeSlider .RangeSlider__fill,
         .RangeSlider .RangeSlider__thumb {
           background-color: var(--color-primary) !important;
           border-color: var(--color-primary) !important;
         }
 
-        .Button.primary, button.Button.primary, .theme-editor-actions > button:not(.translucent) {
+        .Button.primary:not([class*="ReactionButton"]):not(.message-reaction),
+        button.Button.primary:not([class*="ReactionButton"]):not(.message-reaction),
+        .theme-editor-actions > button:not(.translucent) {
           --button-active-background-color: color-mix(in srgb, var(--color-primary) 85%, black) !important;
           --button-no-ripple-background-color: color-mix(in srgb, var(--color-primary) 80%, black) !important;
           background-color: var(--color-primary) !important;
           color: var(--color-white, #fff) !important;
         }
 
-        .Button.primary:hover:not(:disabled),
-        .Button.primary:focus:not(:disabled),
-        .Button.primary:active:not(:disabled),
-        button.Button.primary:hover:not(:disabled),
+        .Button.primary:not([class*="ReactionButton"]):not(.message-reaction):hover:not(:disabled),
+        .Button.primary:not([class*="ReactionButton"]):not(.message-reaction):focus:not(:disabled),
+        .Button.primary:not([class*="ReactionButton"]):not(.message-reaction):active:not(:disabled),
+        button.Button.primary:not([class*="ReactionButton"]):not(.message-reaction):hover:not(:disabled),
         .theme-editor-actions > button:not(.translucent):hover {
           background-color: color-mix(in srgb, var(--color-primary) 85%, black) !important;
           color: var(--color-white, #fff) !important;
@@ -723,22 +834,72 @@
           background-color: var(--color-primary) !important;
         }
 
-        /* Реакции */
-        .ReactionButton.is-chosen,
+        /* Реакции: явное разделение непроставленных и проставленных (без глоу) */
+        .Message .Reactions .Button:not(.chosen):not([class*="chosen"]),
+        .Message .Reactions .message-reaction:not(.chosen):not([class*="chosen"]),
+        button[class*="ReactionButton-module__root"]:not(.chosen):not([class*="chosen"]) {
+          background: rgba(255, 255, 255, 0.08) !important;
+          background-color: rgba(255, 255, 255, 0.08) !important;
+          border: 2px solid transparent !important;
+          color: var(--color-text-secondary, #a2a8b4) !important;
+          box-shadow: none !important;
+        }
+
+        .Message .Reactions .Button.chosen,
+        .Message .Reactions .Button[class*="chosen"],
+        .Message .Reactions .message-reaction.chosen,
+        .Message .Reactions .message-reaction[class*="chosen"],
         .ReactionButton.chosen,
+        .ReactionButton.is-chosen,
         .ReactionSelector .chosen,
-        [class*="ReactionButton"].chosen,
-        [class*="ReactionButton"][class*="chosen"] {
-          background-color: color-mix(in srgb, var(--color-primary) 22%, transparent) !important;
-          border-color: var(--color-primary) !important;
+        button[class*="ReactionButton-module__root"].chosen,
+        button[class*="ReactionButton-module__root"][class*="chosen"] {
+          background: var(--color-primary) !important;
+          background-color: var(--color-primary) !important;
+          border: 2px solid transparent !important;
+          color: #ffffff !important;
+          box-shadow: none !important;
+        }
+
+        /* Все вложенные элементы реакции (эмодзи, текст, счетчик) */
+        .Message .Reactions .Button [class*="animatedEmoji"],
+        .Message .Reactions .Button [class*="counter"],
+        .Message .Reactions .Button [class*="tagText"],
+        .Message .Reactions .message-reaction [class*="animatedEmoji"],
+        .Message .Reactions .message-reaction [class*="counter"],
+        .Message .Reactions .message-reaction [class*="tagText"],
+        [class*="ReactionButton-module__animatedEmoji"],
+        [class*="ReactionButton-module__counter"],
+        [class*="ReactionButton-module__tagText"] {
+          background: transparent !important;
+          background-color: transparent !important;
+          box-shadow: none !important;
+          display: inline-flex !important;
+          align-items: center !important;
+          line-height: 1 !important;
+        }
+
+        .Message .Reactions .Button.chosen *,
+        .Message .Reactions .Button[class*="chosen"] *,
+        .Message .Reactions .message-reaction.chosen *,
+        .Message .Reactions .message-reaction[class*="chosen"] *,
+        button[class*="ReactionButton-module__root"].chosen *,
+        button[class*="ReactionButton-module__root"][class*="chosen"] * {
+          color: #ffffff !important;
+          fill: #ffffff !important;
         }
 
         /* Закрепленные сообщения и шапка */
-        .PinnedMessage .pin-icon,
-        .PinnedMessage::before,
-        .pinned-message-bar::before {
-          color: var(--color-primary) !important;
-          background-color: var(--color-primary) !important;
+        .HeaderPinnedMessageWrapper [class*="title"],
+        [class*="HeaderPinnedMessage-module__title"] {
+          color: var(--color-text-secondary) !important;
+        }
+        [class*="PinnedMessageNavigation-module__pinned-message-border-wrapper-1"],
+        [class*="PinnedMessageNavigation-module__pinned-message-border-mark"] {
+          background: var(--color-text-secondary) !important;
+        }
+        [class*="PinnedMessageNavigation-module__pinned-message-border-wrapper"] {
+          background-color: rgba(var(--color-text-secondary-rgb), 0.25) !important;
         }
 
         /* Спиннеры и круги загрузки */
@@ -766,41 +927,57 @@
       `);
     }
 
-    const ownBgHex = (hasColors && mod.colors['--color-background-own']) || '#2d2d2d';
-    const secBgHex = (hasColors && mod.colors['--color-background-secondary']) || '#181818';
+    if (hasColors && mod.colors['--color-icon-buttons']) {
+      const btnIconHex = mod.colors['--color-icon-buttons'];
+      css.push(`
+        :root {
+          --color-icon-buttons: ${btnIconHex} !important;
+        }
+      `);
+    }
+
+    const hasOwnBg = Boolean(hasColors && mod.colors['--color-background-own']);
+    const ownBgHex = hasOwnBg ? mod.colors['--color-background-own'] : '';
+    const hasSecBg = Boolean(hasColors && mod.colors['--color-background-secondary']);
+    const secBgHex = hasSecBg ? mod.colors['--color-background-secondary'] : '';
+
+    if (hasOwnBg) {
+      css.push(`
+        :root {
+          --color-background-own: ${ownBgHex} !important;
+          --color-background-own-apple: ${ownBgHex} !important;
+          --color-background-own-selected: color-mix(in srgb, ${ownBgHex} 82%, black) !important;
+        }
+        .Message.own {
+          --background-color: var(--color-background-own) !important;
+        }
+        .Message.own.selected {
+          --background-color: var(--color-background-own-selected, color-mix(in srgb, ${ownBgHex} 82%, black)) !important;
+        }
+        .Message.own .message-content.has-solid-background,
+        .message-content.own.has-solid-background,
+        .Message.own .album-item-container {
+          background-color: var(--color-background-own) !important;
+        }
+      `);
+    }
+
+    if (hasSecBg) {
+      css.push(`
+        :root {
+          --color-background-secondary: ${secBgHex} !important;
+        }
+        .Message:not(.own) {
+          --background-color: var(--color-background-secondary) !important;
+        }
+        .Message:not(.own) .message-content.has-solid-background,
+        .message-content:not(.own).has-solid-background {
+          background-color: var(--color-background-secondary) !important;
+        }
+      `);
+    }
 
     css.push(`
-      :root {
-        --color-background-own: ${ownBgHex} !important;
-        --color-background-own-apple: ${ownBgHex} !important;
-        --color-background-own-selected: color-mix(in srgb, ${ownBgHex} 82%, black) !important;
-        --color-background-secondary: ${secBgHex} !important;
-      }
-
-      /* Фон обычных сообщений с контентом */
-      .Message.own {
-        --background-color: var(--color-background-own, ${ownBgHex}) !important;
-      }
-      .Message:not(.own) {
-        --background-color: var(--color-background-secondary, ${secBgHex}) !important;
-      }
-      .Message.own.selected {
-        --background-color: var(--color-background-own-selected, color-mix(in srgb, ${ownBgHex} 82%, black)) !important;
-      }
-      .Message:not(.own).selected {
-        --background-color: var(--color-background-selected, #161616) !important;
-      }
-
-      .Message.own .message-content.has-solid-background,
-      .message-content.own.has-solid-background,
-      .Message.own .album-item-container {
-        background-color: var(--color-background-own, ${ownBgHex}) !important;
-      }
-
-      .Message:not(.own) .message-content.has-solid-background,
-      .message-content:not(.own).has-solid-background {
-        background-color: var(--color-background-secondary, ${secBgHex}) !important;
-      }
 
       /* Стикеры, эмодзи и круглые видео-сообщения (кружочки) строго БЕЗ фона */
       .message-content.custom-shape,
@@ -823,48 +1000,46 @@
       .svg-appendix {
         overflow: visible !important;
       }
-      .svg-appendix .corner {
-        fill: var(--background-color, var(--color-background-secondary, ${secBgHex})) !important;
+      /* Хвостики сообщений (всегда идеально совпадают по цвету с пузырем) */
+      .svg-appendix .corner,
+      .svg-appendix path {
+        fill: var(--background-color, currentColor);
       }
-
-      /* Свои сообщения (исходящие справа по умолчанию) */
       .Message.own .svg-appendix .corner,
       .Message.own .svg-appendix .corner-right,
       .Message.own .svg-appendix path,
       .message-content.own .svg-appendix .corner,
       .message-content.own .svg-appendix .corner-right,
       .message-content.own .svg-appendix path {
-        fill: var(--color-background-own, ${ownBgHex}) !important;
+        fill: var(--color-background-own, ${ownBgHex || 'currentColor'}) !important;
       }
-      .Message.own .svg-appendix .corner-right {
-        display: block !important;
-        fill: var(--color-background-own, ${ownBgHex}) !important;
-      }
-      .Message.own .svg-appendix .corner-left {
-        display: none !important;
-      }
-
-      /* Чужие сообщения (входящие слева по умолчанию) */
       .Message:not(.own) .svg-appendix .corner,
       .Message:not(.own) .svg-appendix .corner-left,
       .Message:not(.own) .svg-appendix path,
       .message-content:not(.own) .svg-appendix .corner,
       .message-content:not(.own) .svg-appendix .corner-left,
       .message-content:not(.own) .svg-appendix path {
-        fill: var(--color-background-secondary, ${secBgHex}) !important;
+        fill: var(--color-background-secondary, ${secBgHex || 'currentColor'}) !important;
       }
-      .Message:not(.own) .svg-appendix .corner-left {
+      .message-content[data-has-custom-appendix] .svg-appendix .corner,
+      .message-content[data-has-custom-appendix] .svg-appendix .corner-left,
+      .message-content[data-has-custom-appendix] .svg-appendix .corner-right,
+      .message-content[data-has-custom-appendix] .svg-appendix path {
+        fill: var(--appendix-bg) !important;
+      }
+
+      .Message.own .svg-appendix .corner-right {
         display: block !important;
-        fill: var(--color-background-secondary, ${secBgHex}) !important;
       }
-      .Message:not(.own) .svg-appendix .corner-right {
+      .Message.own .svg-appendix .corner-left {
         display: none !important;
       }
 
-      /* Кастомные хвостики медиа (альбомы, фото, инвойсы) */
-      .message-content[data-has-custom-appendix] .svg-appendix .corner,
-      .message-content[data-has-custom-appendix] .svg-appendix path {
-        fill: var(--appendix-bg, var(--background-color)) !important;
+      .Message:not(.own) .svg-appendix .corner-left {
+        display: block !important;
+      }
+      .Message:not(.own) .svg-appendix .corner-right {
+        display: none !important;
       }
 
       .Message:not(.own) .message-content.has-appendix {
@@ -1091,6 +1266,10 @@
 
     // --- Сайдбар профиля/информации: точная копия острова меню чатов слева (скругление, фон, отступы, компактность) ---
     css.push(`
+      :root, #Main, #MiddleColumn {
+        --custom-right-column-width: 25.5rem !important;
+      }
+
       #Main #RightColumn-wrapper,
       #RightColumn-wrapper {
         display: none !important;
@@ -1109,9 +1288,17 @@
       }
 
       #Main.right-column-open #RightColumn-wrapper,
-      #Main.right-column-animating #RightColumn-wrapper {
+      #Main.right-column-shown #RightColumn-wrapper {
         display: block !important;
         visibility: visible !important;
+      }
+
+      #Main:not(.right-column-open):not(.right-column-shown) #RightColumn-wrapper,
+      #Main:not(.right-column-open):not(.right-column-shown) #RightColumn {
+        display: none !important;
+        visibility: hidden !important;
+        pointer-events: none !important;
+        opacity: 0 !important;
       }
 
       #RightColumn-wrapper .overlay-backdrop {
@@ -1119,41 +1306,95 @@
         pointer-events: none !important;
       }
 
-      #Main #RightColumn-wrapper #RightColumn,
-      #Main #RightColumn,
+      /* Профиль открывается справа на всю высоту, стандартной ширины (не растягиваясь) */
       #RightColumn {
         position: absolute !important;
         top: 0.5rem !important;
-        left: 0.5rem !important;
         bottom: 0.5rem !important;
-        right: auto !important;
-        width: var(--left-column-custom-width, var(--left-column-width, 26.5rem)) !important;
-        max-width: calc(100vw - 1rem) !important;
+        right: 0.5rem !important;
+        left: auto !important;
+        width: var(--custom-right-column-width, 25.5rem) !important;
+        max-width: var(--custom-right-column-width, 25.5rem) !important;
+        --right-column-content-width: var(--custom-right-column-width, 25.5rem) !important;
+        min-width: 22rem !important;
         height: calc(100% - 1rem) !important;
+        max-height: calc(100% - 1rem) !important;
         border-radius: var(--border-radius-island, 1.5625rem) !important;
         box-shadow: var(--shadow-island) !important;
         overflow: hidden !important;
-        transform: translateX(-1.5rem) !important;
-        opacity: 0 !important;
-        pointer-events: none !important;
+        z-index: 25 !important;
         background-color: var(--color-background) !important;
         background: var(--color-background) !important;
-        transition: transform var(--slide-transition, 250ms cubic-bezier(0.33, 1, 0.68, 1)), opacity var(--slide-transition, 250ms ease) !important;
+        transition: transform var(--layer-transition, 300ms cubic-bezier(0.33, 1, 0.68, 1)), opacity var(--layer-transition, 300ms ease) !important;
       }
 
-      #Main.right-column-open #RightColumn-wrapper #RightColumn,
       #Main.right-column-open #RightColumn {
-        left: 0.5rem !important;
-        right: auto !important;
-        transform: translateX(0) !important;
+        transform: translate3d(0, 0, 0) !important;
         opacity: 1 !important;
         pointer-events: auto !important;
       }
 
+      #Main:not(.right-column-open) #RightColumn {
+        transform: translate3d(calc(100% + 1rem), 0, 0) !important;
+        opacity: 0 !important;
+        pointer-events: none !important;
+      }
+
+      #Main:not(.right-column-shown) #RightColumn {
+        display: none !important;
+        visibility: hidden !important;
+      }
+
+      /* Если профиль открывается слева (на мобильных устройствах или специальной конфигурации) — плавный выезд и заезд влево */
+      #RightColumn.opens-left,
+      #RightColumn[data-side="left"],
+      html[data-profile-position="left"] #RightColumn {
+        right: auto !important;
+        left: 0.5rem !important;
+      }
+
+      #Main:not(.right-column-open) #RightColumn.opens-left,
+      #Main:not(.right-column-open) #RightColumn[data-side="left"],
+      html[data-profile-position="left"] #Main:not(.right-column-open) #RightColumn {
+        transform: translate3d(calc(-100% - 1rem), 0, 0) !important;
+        opacity: 0 !important;
+        pointer-events: none !important;
+      }
+
+      /* Интеллектуальная адаптивная ширина левой колонки: просторная в обычном режиме (до 30rem), компактная (23rem) при открытом профиле */
       #LeftColumn,
       #Main #LeftColumn {
         margin: 0.5rem 0 0.5rem 0.5rem !important;
         height: calc(100% - 1rem) !important;
+        width: var(--left-column-width, 27rem) !important;
+        min-width: 16rem !important;
+        max-width: 30rem !important;
+        box-sizing: border-box !important;
+        will-change: width, max-width !important;
+        transition: width var(--layer-transition, 300ms cubic-bezier(0.33, 1, 0.68, 1)), max-width var(--layer-transition, 300ms cubic-bezier(0.33, 1, 0.68, 1)), transform var(--layer-transition) !important;
+      }
+
+      /* В обычном состоянии (профиль закрыт): левый сайдбар шире и просторнее (по умолчанию 27rem, возможность растянуть до 30rem) */
+      #Main:not(.right-column-open) #LeftColumn,
+      #Main:not(.right-column-open) #Main #LeftColumn,
+      #Main.right-column-closing #LeftColumn,
+      #Main.right-column-closing #Main #LeftColumn {
+        width: var(--left-column-width, 27rem) !important;
+        max-width: 30rem !important;
+      }
+
+      /* При открытом профиле: левый сайдбар плавно сужается до компактных 23rem, освобождая место для чата */
+      @media (min-width: 926px) {
+        #Main.right-column-open:not(.right-column-closing) #LeftColumn,
+        #Main.right-column-open:not(.right-column-closing) #Main #LeftColumn {
+          width: min(var(--left-column-width, 23rem), 23rem) !important;
+          max-width: 23rem !important;
+        }
+      }
+
+      body.no-page-transitions #LeftColumn,
+      body.no-right-column-animations #LeftColumn {
+        transition: none !important;
       }
 
       .ArchivedChats,
@@ -1180,36 +1421,36 @@
         padding-bottom: 0 !important;
       }
 
-      /* Полное скрытие скроллбара в профиле/сайдбаре, сохраняя прокрутку */
+      /* Полное скрытие скроллбара везде, сохраняя прокрутку */
       #RightColumn,
       #RightColumn *,
       #RightColumn .custom-scroll,
       #RightColumn .Profile,
       #RightColumn .panel-content,
-      #RightColumn .Management {
+      #RightColumn .Management,
+      #LeftColumn,
+      #LeftColumn *,
+      #LeftColumn .custom-scroll,
+      .custom-scroll,
+      .settings-main-scroll {
         scrollbar-width: none !important;
         -ms-overflow-style: none !important;
         --scrollbar-width: 0px !important;
       }
 
       #RightColumn::-webkit-scrollbar,
-      #RightColumn *::-webkit-scrollbar {
+      #RightColumn *::-webkit-scrollbar,
+      #LeftColumn::-webkit-scrollbar,
+      #LeftColumn *::-webkit-scrollbar,
+      .custom-scroll::-webkit-scrollbar,
+      .settings-main-scroll::-webkit-scrollbar {
         display: none !important;
         width: 0 !important;
         height: 0 !important;
         background: transparent !important;
       }
 
-      /* Симметричные отступы карточек профиля без искажений от скроллбара */
-      #RightColumn [class*="chatExtraBlock"],
-      #RightColumn .chatExtraBlock,
-      #RightColumn [class*="sharedMediaTabs"],
-      #RightColumn .sharedMediaTabs,
-      #RightColumn [class*="linkedCommunityIsland"],
-      #RightColumn .linkedCommunityIsland {
-        margin-inline-end: 1rem !important;
-        padding-inline-end: 1rem !important;
-      }
+      /* Карточки профиля: естественные симметричные отступы */
 
       #RightColumn .RightHeader {
         height: var(--column-header-height, 3.5rem) !important;
@@ -1221,17 +1462,18 @@
         backdrop-filter: none !important;
       }
 
+      /* Убираем только backdrop-filter, НЕ трогаем фон — иначе пропадают разделения между блоками */
       #RightColumn > .Transition,
       #RightColumn .panel-content,
       #RightColumn .Management,
-      #RightColumn .ManagementScreens,
-      #RightColumn .TabList,
-      #RightColumn [class*="sharedMedia"],
-      #RightColumn [class*="chatExtra"] {
+      #RightColumn .ManagementScreens {
         backdrop-filter: none !important;
         -webkit-backdrop-filter: none !important;
-        background-color: var(--color-background) !important;
-        background: var(--color-background) !important;
+      }
+
+      /* Фон контейнера Profile (scroll root) — вторичный, чтобы Island-карточки выделялись */
+      #RightColumn .Profile {
+        background-color: var(--color-background-secondary) !important;
       }
 
       @media (max-width: 600px) {
@@ -1265,7 +1507,6 @@
       }
 
       #MiddleColumn .MessageList,
-      #MiddleColumn .MessageList .messages-container,
       #MiddleColumn .messages-layout,
       #MiddleColumn .AudioPlayer,
       #MiddleColumn .MiddleSearch,
@@ -1383,183 +1624,347 @@
     `);
 
     // --- Ширина чата: синхронизированные размеры шапки, сообщений и поля ввода (full, wide, default) ---
-    if (mod.chatWidth === 'full') {
+    const isFull = mod.chatWidth === 'full';
+    const isWide = mod.chatWidth === 'wide';
+    const containerWidth = isFull
+      ? 'calc(100% - 1rem)'
+      : (isWide ? 'min(65rem, calc(100% - 1rem))' : 'min(47.5rem, calc(100% - 1rem))');
+
+    css.push(`
+      :root, #Main, #MiddleColumn {
+        --messages-container-width: ${containerWidth} !important;
+      }
+
+      /* Базовое центрирование и аппаратное GPU-ускорение шапки, закрепленных сообщений, сообщений и поля ввода */
+      #MiddleColumn .MiddleHeader,
+      #MiddleColumn .MiddleHeaderPanesIsland,
+      #MiddleColumn .middle-column-footer,
+      #MiddleColumn .MessageList .messages-container,
+      #MiddleColumn .messages-container {
+        position: absolute !important;
+        left: 0 !important;
+        right: 0 !important;
+        margin-left: auto !important;
+        margin-right: auto !important;
+        width: var(--messages-container-width) !important;
+        max-width: calc(100% - 1rem) !important;
+        box-sizing: border-box !important;
+        transform: translate3d(0, 0, 0) !important;
+        will-change: transform !important;
+        /* Плавный GPU-сдвиг transform без изменения размеров (никакого ресайза и перерисовок сообщений) */
+        transition: transform var(--layer-transition, 300ms cubic-bezier(0.33, 1, 0.68, 1)) !important;
+      }
+
+      #MiddleColumn .MiddleHeader {
+        top: 0.5rem !important;
+        margin-top: 0 !important;
+        margin-bottom: 0 !important;
+        z-index: 12 !important;
+      }
+
+      #MiddleColumn .MiddleHeaderPanesIsland {
+        top: calc(0.5rem + var(--middle-header-height, 3.5rem) + 0.35rem) !important;
+        margin-top: 0 !important;
+        margin-bottom: 0 !important;
+        z-index: 11 !important;
+      }
+
+      #MiddleColumn .middle-column-footer {
+        bottom: 0.5rem !important;
+        margin-top: 0 !important;
+        margin-bottom: 0 !important;
+        display: flex !important;
+        justify-content: center !important;
+        align-items: flex-end !important;
+        padding: 0 !important;
+      }
+
+      #MiddleColumn .MessageList .messages-container,
+      #MiddleColumn .messages-container {
+        position: relative !important;
+        max-width: calc(100% - 1rem) !important;
+      }
+
+      /* Плавная адаптация ширины левого сайдбара при открытии профиля: 23rem в открытом состоянии, возврат к пользовательскому при закрытии */
+      #Main.right-column-open:not(.right-column-closing) #LeftColumn {
+        width: 23rem !important;
+        max-width: 23rem !important;
+      }
+
+      #Main:not(.right-column-open) #LeftColumn,
+      #Main.right-column-closing #LeftColumn {
+        width: var(--left-column-width, 27rem) !important;
+        max-width: 30rem !important;
+      }
+
+      /* При открытии профиля: чат аппаратно сдвигается ровно посередине в свободное пространство без изменения размеров (никакого ресайза и перерисовок) */
+      #Main.right-column-open:not(.right-column-closing) #MiddleColumn .MiddleHeader,
+      #Main.right-column-open:not(.right-column-closing) #MiddleColumn .MiddleHeaderPanesIsland,
+      #Main.right-column-open:not(.right-column-closing) #MiddleColumn .middle-column-footer,
+      #Main.right-column-open:not(.right-column-closing) #MiddleColumn .MessageList .messages-container,
+      #Main.right-column-open:not(.right-column-closing) #MiddleColumn .messages-container {
+        transform: translate3d(calc(-1 * (var(--custom-right-column-width, 25.5rem) + 0.5rem) / 2), 0, 0) !important;
+      }
+
+      html[data-profile-position="left"] #Main.right-column-open:not(.right-column-closing) #MiddleColumn .MiddleHeader,
+      html[data-profile-position="left"] #Main.right-column-open:not(.right-column-closing) #MiddleColumn .MiddleHeaderPanesIsland,
+      html[data-profile-position="left"] #Main.right-column-open:not(.right-column-closing) #MiddleColumn .middle-column-footer,
+      html[data-profile-position="left"] #Main.right-column-open:not(.right-column-closing) #MiddleColumn .MessageList .messages-container,
+      html[data-profile-position="left"] #Main.right-column-open:not(.right-column-closing) #MiddleColumn .messages-container {
+        transform: translate3d(calc((var(--custom-right-column-width, 25.5rem) + 0.5rem) / 2), 0, 0) !important;
+      }
+
+      #Main:not(.right-column-open) #MiddleColumn .MiddleHeader,
+      #Main:not(.right-column-open) #MiddleColumn .MiddleHeaderPanesIsland,
+      #Main:not(.right-column-open) #MiddleColumn .middle-column-footer,
+      #Main:not(.right-column-open) #MiddleColumn .MessageList .messages-container,
+      #Main:not(.right-column-open) #MiddleColumn .messages-container,
+      #Main.right-column-closing #MiddleColumn .MiddleHeader,
+      #Main.right-column-closing #MiddleColumn .MiddleHeaderPanesIsland,
+      #Main.right-column-closing #MiddleColumn .middle-column-footer,
+      #Main.right-column-closing #MiddleColumn .MessageList .messages-container,
+      #Main.right-column-closing #MiddleColumn .messages-container {
+        transform: translate3d(0, 0, 0) !important;
+      }
+
+      /* Защита от сброса ширины контейнера при добавлении класса narrow-message-list */
+      #Main.narrow-message-list #MiddleColumn .messages-container,
+      #Main.narrow-message-list #MiddleColumn .MessageList .messages-container {
+        width: var(--messages-container-width) !important;
+        max-width: calc(100% - 1rem) !important;
+      }
+
+      /* =========================================================================
+         ГАРАНТИРОВАННАЯ ПОЛНАЯ ШИРИНА СООБЩЕНИЙ С АЛЬБОМАМИ (МЕДИА-ГРУППАМИ)
+         ========================================================================= */
+      #MiddleColumn .Message.is-album > .message-content-wrapper,
+      #MiddleColumn .Message:has(.Album) > .message-content-wrapper {
+        width: min(var(--max-width, 29rem), 100%) !important;
+        min-width: min(var(--max-width, 29rem), 100%) !important;
+      }
+
+      #MiddleColumn .Message.is-album .message-content,
+      #MiddleColumn .Message .message-content:has(.Album) {
+        width: 100% !important;
+        min-width: 100% !important;
+        max-width: 100% !important;
+        box-sizing: border-box !important;
+      }
+
+      /* =========================================================================
+         1. ПРИЛЕГАНИЕ МЕДИА И АЛЬБОМОВ К КРАЯМ СООБЩЕНИЙ С ФОНОМ (0px зазор по бокам)
+         ========================================================================= */
+      #MiddleColumn .Message .message-content.has-solid-background > .content-inner > .media-inner,
+      #MiddleColumn .Message .message-content.has-solid-background > .content-inner > .Album,
+      #MiddleColumn .Message .message-content.has-solid-background:has(.media-inner) > .content-inner > .media-inner,
+      #MiddleColumn .Message .message-content.has-solid-background:has(.Album) > .content-inner > .Album,
+      #MiddleColumn .Message .message-content.text.media > .content-inner > .media-inner,
+      #MiddleColumn .Message .message-content.text.has-adaptive-width > .content-inner > .media-inner,
+      #MiddleColumn .Message .message-content.text.is-album > .content-inner > .Album,
+      #MiddleColumn .Message .message-content.text.media > .content-inner > .Album,
+      #MiddleColumn .Message.is-album .message-content.text > .content-inner > .Album,
+      #MiddleColumn .Message .message-content.text:has(.Album) > .content-inner > .Album,
+      #MiddleColumn .Message .message-content.has-subheader.media > .content-inner > .media-inner,
+      #MiddleColumn .Message .message-content.has-subheader.media > .content-inner > .Album,
+      #MiddleColumn .Message .message-content.is-forwarded.media > .content-inner > .media-inner,
+      #MiddleColumn .Message .message-content.is-forwarded.media > .content-inner > .Album {
+        width: calc(100% + var(--message-media-breakout-left, 0.5rem) + var(--message-media-breakout-right, 0.5rem)) !important;
+        max-width: calc(100% + var(--message-media-breakout-left, 0.5rem) + var(--message-media-breakout-right, 0.5rem)) !important;
+        margin-left: calc(-1 * var(--message-media-breakout-left, 0.5rem)) !important;
+        margin-right: calc(-1 * var(--message-media-breakout-right, 0.5rem)) !important;
+      }
+
+      /* =========================================================================
+         2. ЧИСТЫЕ МЕДИА И АЛЬБОМЫ БЕЗ ФОНА/ТЕКСТА: 100% ширина без вылетов
+         ========================================================================= */
+      #MiddleColumn .Message .message-content:not(.has-solid-background):not(.text) > .content-inner > .media-inner,
+      #MiddleColumn .Message .message-content:not(.has-solid-background):not(.text) .media-inner {
+        width: 100% !important;
+        max-width: 100% !important;
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+      }
+
+      #MiddleColumn .Message .message-content:not(.has-solid-background):not(.text) .Album,
+      #MiddleColumn .Message.is-album .message-content:not(.has-solid-background):not(.text) .Album {
+        width: 100% !important;
+        max-width: 100% !important;
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+      }
+
+      #MiddleColumn .Message .message-content.media:not(.text):not(:has(.Album)) {
+        width: fit-content !important;
+        max-width: 100% !important;
+        box-sizing: border-box !important;
+      }
+
+      /* Фиксация даты и просмотров внутри правого нижнего угла медиа */
+      #MiddleColumn .Message .message-content.media:not(.text):not(:has(> .CommentButton)):not(.has-bottom-comment-button):not(.has-replies) > .MessageMeta,
+      #MiddleColumn .Message.is-album .message-content:not(.text):not(:has(> .CommentButton)):not(.has-bottom-comment-button):not(.has-replies) > .MessageMeta {
+        position: absolute !important;
+        right: 0.375rem !important;
+        bottom: 0.375rem !important;
+        left: auto !important;
+        z-index: 5 !important;
+        max-width: calc(100% - 0.75rem) !important;
+      }
+
+      /* Если есть кнопка комментариев под медиа — дата и просмотры строго над ней в углу медиа */
+      #MiddleColumn .Message .message-content.media:not(.text):is(:has(> .CommentButton), .has-bottom-comment-button, .has-replies) > .MessageMeta,
+      #MiddleColumn .Message.is-album .message-content:not(.text):is(:has(> .CommentButton), .has-bottom-comment-button, .has-replies) > .MessageMeta {
+        position: absolute !important;
+        right: 0.375rem !important;
+        bottom: 3.375rem !important;
+        left: auto !important;
+        z-index: 5 !important;
+        max-width: calc(100% - 0.75rem) !important;
+      }
+
+      /* Реакции и дата/просмотры внизу сообщения: выравнивание и прозрачный фон даты */
+      #MiddleColumn .Message .Reactions {
+        display: flex !important;
+        align-items: center !important;
+        flex-wrap: wrap !important;
+        gap: 0.375rem !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
+        padding: 0.125rem 0.25rem !important;
+      }
+
+      #MiddleColumn .Message .Reactions .MessageMeta,
+      #MiddleColumn .Message .MessageMeta.reactions-offset {
+        position: relative !important;
+        top: 0 !important;
+        bottom: auto !important;
+        right: auto !important;
+        left: auto !important;
+        align-self: center !important;
+        margin-left: auto !important;
+        margin-top: 0 !important;
+        margin-bottom: 0 !important;
+        margin-right: 0 !important;
+        padding: 0 !important;
+        height: auto !important;
+        line-height: inherit !important;
+        background: transparent !important;
+        background-color: transparent !important;
+        box-shadow: none !important;
+        color: var(--color-text-secondary, #9da7b7) !important;
+        white-space: nowrap !important;
+      }
+
+      #MiddleColumn .Message .Reactions .MessageMeta *,
+      #MiddleColumn .Message .MessageMeta.reactions-offset * {
+        color: var(--color-text-secondary, #9da7b7) !important;
+      }
+
+      /* Общие стили содержимого медиа и элементов альбома */
+      #MiddleColumn .Message .media-inner > video,
+      #MiddleColumn .Message .media-inner > img,
+      #MiddleColumn .Message .media-inner > canvas,
+      #MiddleColumn .Message .media-inner > .full-media,
+      #MiddleColumn .Message .media-inner > .thumbnail {
+        width: 100% !important;
+        height: 100% !important;
+        object-fit: cover !important;
+      }
+
+      #MiddleColumn .Message .Album .album-item-select-wrapper {
+        width: 100% !important;
+        height: 100% !important;
+      }
+
+      #MiddleColumn .Message .Album .album-item-select-wrapper .media-inner {
+        width: 100% !important;
+        height: 100% !important;
+        margin: 0 !important;
+      }
+
+      #MiddleColumn .Message .Album .album-item-select-wrapper .media-inner img,
+      #MiddleColumn .Message .Album .album-item-select-wrapper .media-inner video {
+        width: 100% !important;
+        height: 100% !important;
+        object-fit: cover !important;
+      }
+
+      /* =========================================================================
+         3. ГРУППЫ ДОКУМЕНТОВ/ФАЙЛОВ: оба файла строго одинаковой полной ширины
+         ========================================================================= */
+      #MiddleColumn .Message.is-in-document-group > .message-content-wrapper {
+        width: min(32rem, 100%) !important;
+        min-width: min(32rem, 100%) !important;
+        max-width: 70% !important;
+      }
+
+      #MiddleColumn .Message.is-in-document-group .message-content.document {
+        width: 100% !important;
+        min-width: 100% !important;
+        max-width: 100% !important;
+        box-sizing: border-box !important;
+      }
+
+      #MiddleColumn .Message.is-in-document-group .File {
+        width: 100% !important;
+        min-width: 100% !important;
+      }
+
+      /* Веб-превью страниц (ссылки на YouTube и т.д.): пропорциональный красивый размер, не узкий */
+      #MiddleColumn .Message .WebPage {
+        width: min(38rem, 100%) !important;
+        max-width: 100% !important;
+        min-width: min(20rem, 100%) !important;
+      }
+
+      #MiddleColumn .Message .WebPage .media-inner:not(.square-image) {
+        width: 100% !important;
+        max-width: 100% !important;
+      }
+    `);
+
+    if (isFull || isWide) {
       css.push(`
-        :root, #Main, #MiddleColumn {
-          --messages-container-width: calc(100% - 1rem) !important;
-        }
-
-        #MiddleColumn .MiddleHeader {
-          position: absolute !important;
-          top: 0.5rem !important;
-          left: 0.5rem !important;
-          right: 0.5rem !important;
-          width: auto !important;
-          max-width: none !important;
-          margin: 0 !important;
-          transform: none !important;
-          z-index: 12 !important;
-        }
-
-        #MiddleColumn .MiddleHeaderPanesIsland {
-          position: absolute !important;
-          top: calc(0.5rem + var(--middle-header-height, 3.5rem) + 0.35rem) !important;
-          left: 0.5rem !important;
-          right: 0.5rem !important;
-          width: auto !important;
-          max-width: none !important;
-          margin: 0 !important;
-          transform: none !important;
-          z-index: 11 !important;
-        }
-
-        #MiddleColumn .middle-column-footer {
-          position: absolute !important;
-          bottom: 0.5rem !important;
-          left: 0.5rem !important;
-          right: 0.5rem !important;
-          width: auto !important;
-          max-width: none !important;
-          margin: 0 !important;
-          transform: none !important;
-          display: flex !important;
-          justify-content: center !important;
-          align-items: flex-end !important;
-          padding: 0 !important;
-        }
-
-        #MiddleColumn .MessageList .messages-container,
-        #MiddleColumn .messages-container {
-          width: 100% !important;
-          max-width: 100% !important;
-          margin: 0 !important;
-          padding-left: 1rem !important;
-          padding-right: 1rem !important;
-        }
-
+        /* Сообщения слева и справа сжаты ровно до 70% ширины контейнера */
         #MiddleColumn .Message {
-          --max-width: min(65rem, 85vw) !important;
+          --max-width: min(44rem, 70vw);
+          --media-max-height: 32rem;
         }
 
-        #MiddleColumn .message-content-wrapper,
-        #MiddleColumn .message-content {
-          max-width: min(65rem, 85vw) !important;
+        #MiddleColumn .Message:not(.is-in-document-group) > .message-content-wrapper {
+          max-width: min(44rem, 70%) !important;
         }
 
-        #MiddleColumn .Album {
-          width: 100% !important;
-          max-width: 95% !important;
-        }
-      `);
-    } else if (mod.chatWidth === 'wide') {
-      css.push(`
-        :root, #Main, #MiddleColumn {
-          --messages-container-width: min(65rem, calc(100% - 1rem)) !important;
-        }
-
-        #MiddleColumn .MiddleHeader,
-        #MiddleColumn .MiddleHeaderPanesIsland,
-        #MiddleColumn .middle-column-footer {
-          position: absolute !important;
-          left: 50% !important;
-          right: auto !important;
-          transform: translateX(-50%) !important;
-          width: min(65rem, calc(100% - 1rem)) !important;
-          max-width: min(65rem, calc(100% - 1rem)) !important;
+        #MiddleColumn .Message .message-content {
+          max-width: min(var(--max-width, 44rem), 100%) !important;
           box-sizing: border-box !important;
         }
 
-        #MiddleColumn .MiddleHeader {
-          top: 0.5rem !important;
-          margin: 0 !important;
-          z-index: 12 !important;
-        }
-
-        #MiddleColumn .MiddleHeaderPanesIsland {
-          top: calc(0.5rem + var(--middle-header-height, 3.5rem) + 0.35rem) !important;
-          margin: 0 !important;
-          z-index: 11 !important;
-        }
-
-        #MiddleColumn .middle-column-footer {
-          bottom: 0.5rem !important;
-          margin: 0 !important;
-          display: flex !important;
-          justify-content: center !important;
-          align-items: flex-end !important;
-          padding: 0 !important;
-        }
-
-        #MiddleColumn .MessageList .messages-container,
-        #MiddleColumn .messages-container {
-          width: min(65rem, calc(100% - 1rem)) !important;
-          max-width: min(65rem, calc(100% - 1rem)) !important;
-          margin-left: auto !important;
-          margin-right: auto !important;
-        }
-
-        #MiddleColumn .Message {
-          --max-width: min(48rem, 75vw) !important;
-        }
-
-        #MiddleColumn .message-content-wrapper,
-        #MiddleColumn .message-content {
-          max-width: min(48rem, 75vw) !important;
+        /* Сообщения с медиа и текстом: комфортная ширина до 70% */
+        #MiddleColumn .Message .message-content.media.text,
+        #MiddleColumn .Message .message-content.has-adaptive-width.text {
+          min-width: min(22rem, 100%) !important;
+          max-width: 100% !important;
         }
       `);
     } else {
       css.push(`
-        :root, #Main, #MiddleColumn {
-          --messages-container-width: min(47.5rem, calc(100% - 1rem)) !important;
-        }
-
-        #MiddleColumn .MiddleHeader,
-        #MiddleColumn .MiddleHeaderPanesIsland,
-        #MiddleColumn .middle-column-footer {
-          position: absolute !important;
-          left: 50% !important;
-          right: auto !important;
-          transform: translateX(-50%) !important;
-          width: min(47.5rem, calc(100% - 1rem)) !important;
-          max-width: min(47.5rem, calc(100% - 1rem)) !important;
-          box-sizing: border-box !important;
-        }
-
-        #MiddleColumn .MiddleHeader {
-          top: 0.5rem !important;
-          margin: 0 !important;
-          z-index: 12 !important;
-        }
-
-        #MiddleColumn .MiddleHeaderPanesIsland {
-          top: calc(0.5rem + var(--middle-header-height, 3.5rem) + 0.35rem) !important;
-          margin: 0 !important;
-          z-index: 11 !important;
-        }
-
-        #MiddleColumn .middle-column-footer {
-          bottom: 0.5rem !important;
-          margin: 0 !important;
-          display: flex !important;
-          justify-content: center !important;
-          align-items: flex-end !important;
-          padding: 0 !important;
-        }
-
-        #MiddleColumn .MessageList .messages-container,
-        #MiddleColumn .messages-container {
-          width: min(47.5rem, calc(100% - 1rem)) !important;
-          max-width: min(47.5rem, calc(100% - 1rem)) !important;
-          margin-left: auto !important;
-          margin-right: auto !important;
-        }
-
+        /* В стандартном режиме (по умолчанию): аккуратная ширина сообщений */
         #MiddleColumn .Message {
           --max-width: 32rem !important;
         }
 
-        #MiddleColumn .message-content-wrapper,
-        #MiddleColumn .message-content {
+        #MiddleColumn .Message:not(.is-in-document-group) > .message-content-wrapper {
+          max-width: 32rem !important;
+        }
+
+        #MiddleColumn .Message .message-content {
+          max-width: 32rem !important;
+          box-sizing: border-box !important;
+        }
+
+        #MiddleColumn .Message .message-content.media.text,
+        #MiddleColumn .Message .message-content.has-adaptive-width.text {
+          min-width: min(18rem, 100%) !important;
           max-width: 32rem !important;
         }
       `);
@@ -1576,16 +1981,14 @@
         text-overflow: clip !important;
       }
 
-      /* Гарантированное удержание сообщений внутри границ чата */
+      /* Гарантированное удержание сообщений внутри границ чата без схлопывания контента */
       .Message,
       .message-content-wrapper,
-      .message-content,
       .with-subheader {
         min-width: 0 !important;
       }
 
       .message-content {
-        max-width: var(--max-width, 30rem) !important;
         box-sizing: border-box !important;
       }
 
@@ -1598,6 +2001,11 @@
         left: auto !important;
         right: -0.875rem !important;
       }
+      html[data-message-align-own="left"] .Message.own .Reactions,
+      html[data-message-align-own="left"] .Message.own .Reactions.is-outside {
+        flex-direction: row !important;
+        justify-content: flex-start !important;
+      }
       html[data-message-align-own="center"] .Message.own {
         flex-direction: row !important;
         justify-content: center !important;
@@ -1605,6 +2013,11 @@
       html[data-message-align-own="center"] .Message.own .quick-reaction {
         left: auto !important;
         right: -0.875rem !important;
+      }
+      html[data-message-align-own="center"] .Message.own .Reactions,
+      html[data-message-align-own="center"] .Message.own .Reactions.is-outside {
+        flex-direction: row !important;
+        justify-content: center !important;
       }
       html[data-message-align-own="right"] .Message.own {
         flex-direction: row-reverse !important;
@@ -1616,6 +2029,11 @@
         flex-direction: row-reverse !important;
         justify-content: flex-start !important;
         padding-left: 0 !important;
+      }
+      html[data-message-align-other="right"] .Message:not(.own) .Reactions,
+      html[data-message-align-other="right"] .Message:not(.own) .Reactions.is-outside {
+        flex-direction: row-reverse !important;
+        justify-content: flex-start !important;
       }
       html[data-message-align-other="right"] .Message:not(.own):has(> .Avatar) {
         padding-right: 2.5rem !important;
@@ -1706,9 +2124,44 @@
     // --- Скругления: раздельные типы объектов ---
     if (mod.radii || mod.borderRadius !== undefined) {
       const rUi = mod.radii?.ui !== undefined ? Number(mod.radii.ui) : (mod.borderRadius !== undefined ? Number(mod.borderRadius) : 16);
+      const rFs = mod.radii?.foldersSidebar !== undefined ? Number(mod.radii.foldersSidebar) : (rUi + 8);
       const rMsg = mod.radii?.messages !== undefined ? Number(mod.radii.messages) : (mod.borderRadius !== undefined ? Number(mod.borderRadius) : 15);
       const rBtn = mod.radii?.buttons !== undefined ? Number(mod.radii.buttons) : (mod.borderRadius !== undefined ? Math.max(2, Number(mod.borderRadius) - 4) : 12);
       const rAv = mod.radii?.avatars !== undefined ? Number(mod.radii.avatars) : 50;
+
+      // Устанавливаем свойства напрямую на htmlStyle с !important для немедленного переопределения
+      htmlStyle.setProperty('--border-radius-island', `${(rUi + 8) / 16}rem`, 'important');
+      htmlStyle.setProperty('--border-radius-modal', `${(rUi + 16) / 16}rem`, 'important');
+      htmlStyle.setProperty('--border-radius-default', `${rUi / 16}rem`, 'important');
+      htmlStyle.setProperty('--border-radius-pane', `${(rUi + 8) / 16}rem`, 'important');
+      htmlStyle.setProperty('--border-radius-ui', `${rUi}px`, 'important');
+      htmlStyle.setProperty('--border-radius-folders-sidebar', `${rFs / 16}rem`, 'important');
+
+      htmlStyle.setProperty('--border-radius-messages', `${rMsg / 16}rem`, 'important');
+      htmlStyle.setProperty('--border-radius-messages-small', `${Math.max(2, rMsg - 8) / 16}rem`, 'important');
+
+      htmlStyle.setProperty('--border-radius-button', `${rBtn / 16}rem`, 'important');
+      htmlStyle.setProperty('--border-radius-buttons', `${rBtn}px`, 'important');
+      htmlStyle.setProperty('--border-radius-default-small', `${Math.max(2, rBtn - 4) / 16}rem`, 'important');
+      htmlStyle.setProperty('--border-radius-default-tiny', `${Math.max(2, rBtn - 8) / 16}rem`, 'important');
+
+      htmlStyle.setProperty('--avatar-radius', `${rAv}%`, 'important');
+      htmlStyle.setProperty('--border-radius-avatars', `${rAv}%`, 'important');
+
+      const activeThemeStyleEl = document.getElementById('ethernet-active-theme-style');
+      if (activeThemeStyleEl && activeThemeStyleEl.textContent) {
+        let t = activeThemeStyleEl.textContent;
+        t = t.replace(/--border-radius-messages\s*:\s*[^;]+;/g, `--border-radius-messages: ${rMsg / 16}rem !important;`);
+        t = t.replace(/--border-radius-messages-small\s*:\s*[^;]+;/g, `--border-radius-messages-small: ${Math.max(2, rMsg - 8) / 16}rem !important;`);
+        t = t.replace(/--border-radius-ui\s*:\s*[^;]+;/g, `--border-radius-ui: ${rUi}px !important;`);
+        t = t.replace(/--border-radius-folders-sidebar\s*:\s*[^;]+;/g, `--border-radius-folders-sidebar: ${rFs / 16}rem !important;`);
+        t = t.replace(/--border-radius-default\s*:\s*[^;]+;/g, `--border-radius-default: ${rUi / 16}rem !important;`);
+        t = t.replace(/--border-radius-button\s*:\s*[^;]+;/g, `--border-radius-button: ${rBtn / 16}rem !important;`);
+        t = t.replace(/--border-radius-buttons\s*:\s*[^;]+;/g, `--border-radius-buttons: ${rBtn}px !important;`);
+        t = t.replace(/--avatar-radius\s*:\s*[^;]+;/g, `--avatar-radius: ${rAv}% !important;`);
+        t = t.replace(/--border-radius-avatars\s*:\s*[^;]+;/g, `--border-radius-avatars: ${rAv}% !important;`);
+        activeThemeStyleEl.textContent = t;
+      }
 
       css.push(`
         :root {
@@ -1716,6 +2169,7 @@
           --border-radius-modal: ${(rUi + 16) / 16}rem !important;
           --border-radius-default: ${rUi / 16}rem !important;
           --border-radius-pane: ${(rUi + 8) / 16}rem !important;
+          --border-radius-folders-sidebar: ${rFs / 16}rem !important;
 
           --border-radius-messages: ${rMsg / 16}rem !important;
           --border-radius-messages-small: ${Math.max(2, rMsg - 8) / 16}rem !important;
@@ -1741,7 +2195,7 @@
           border-radius: ${rAv}% !important;
         }
 
-        .bubble, .ListItem-button, #LeftColumn, #MiddleColumn, .MiddleHeader, .Composer, .Avatar, .Button, .Island {
+        .bubble, .message-content, .media-inner, .Album, .ListItem-button, #LeftColumn, #MiddleColumn, .MiddleHeader, .Composer, .Avatar, .Button, .Island {
           transition: border-radius 0.25s cubic-bezier(0.33, 1, 0.68, 1);
         }
       `);
@@ -1778,11 +2232,12 @@
     // Служебные и сервисные плашки сообщений (даты, уведомления)
     css.push(`
       .ActionMessage .bubble,
+      .ActionMessage [class*="textContent"],
+      .ActionMessage [class*="contentBox"],
       .action-message-content {
-        background-color: rgba(0, 0, 0, 0.55) !important;
-        backdrop-filter: blur(12px) !important;
-        -webkit-backdrop-filter: blur(12px) !important;
-        color: #ffffff !important;
+        background-color: var(--color-background-secondary, var(--color-background, #16171a)) !important;
+        background: var(--color-background-secondary, var(--color-background, #16171a)) !important;
+        color: var(--color-text, #ffffff) !important;
         border-radius: var(--border-radius-messages, 12px) !important;
       }
 
@@ -1810,7 +2265,7 @@
         background-color: color-mix(in srgb, var(--color-background-secondary, #181818) 90%, transparent) !important;
         backdrop-filter: blur(20px) saturate(180%) !important;
         -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
-        border: 1px solid color-mix(in srgb, var(--color-borders, #2f2f2f) 45%, transparent) !important;
+        border: none !important;
         border-radius: var(--border-radius-default, 12px) !important;
         box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45) !important;
         color: var(--color-text, #ebebeb) !important;
@@ -1831,7 +2286,7 @@
         background-color: color-mix(in srgb, var(--color-background-secondary, #141414) 92%, transparent) !important;
         backdrop-filter: blur(16px) saturate(180%) !important;
         -webkit-backdrop-filter: blur(16px) saturate(180%) !important;
-        border: 1px solid color-mix(in srgb, var(--color-borders, #333333) 50%, transparent) !important;
+        border: none !important;
         border-radius: 8px !important;
         box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45) !important;
         opacity: 0;
@@ -1951,7 +2406,7 @@
 
         .Message.own .svg-appendix .corner-left {
           display: block !important;
-          fill: var(--color-background-own, ${ownBgHex}) !important;
+          fill: var(--appendix-bg, var(--color-background-own)) !important;
         }
 
         .Message.own .svg-appendix .corner-right {
@@ -2026,9 +2481,18 @@
         }
 
         .Message:not(.own):not(.document-group-member) .svg-appendix {
-          right: -0.551rem !important;
+          right: -0.562rem !important;
           left: auto !important;
-          transform: scaleX(-1) !important;
+          transform: none !important;
+        }
+
+        .Message:not(.own):not(.document-group-member) .svg-appendix .corner-right {
+          display: block !important;
+          fill: var(--appendix-bg, var(--color-background-secondary)) !important;
+        }
+
+        .Message:not(.own):not(.document-group-member) .svg-appendix .corner-left {
+          display: none !important;
         }
       `);
     } else if (mod.messageAlignOther === 'center') {
@@ -2161,12 +2625,28 @@
         font-weight: 600 !important;
       }
 
+      /* Титул профиля (имя пользователя / чата / канала) — выразительный жирный 700 */
+      #RightColumn .ProfileInfo .fullName,
+      #RightColumn .ProfileInfo .fullName *,
+      #RightColumn .ProfileInfo .title,
+      #RightColumn .ProfileInfo .title *,
+      #RightColumn .ProfileInfo h3,
+      #RightColumn .ProfileInfo h3 *,
+      .ProfileInfo .fullName,
+      .ProfileInfo .fullName *,
+      .ProfileInfo .title,
+      .ProfileInfo .title *,
+      .ProfileInfo h3,
+      .ProfileInfo h3 * {
+        font-weight: 700 !important;
+      }
+
       body, p, span, .message-content, .ListItem .subtitle, .last-message {
         font-weight: 400;
       }
 
       strong, b, .bold {
-        font-weight: 700 !important;
+        font-weight: 600 !important;
       }
 
       /* Названия чатов, каналов и пользователей всегда используют основной цвет текста, а не цвет цветных ссылок */
@@ -2191,7 +2671,7 @@
       :root {
         --color-chat-hover: rgba(255, 255, 255, 0.08) !important;
         --color-interactive-hover: rgba(255, 255, 255, 0.08) !important;
-        --action-message-bg: rgba(22, 23, 26, 0.78) !important;
+        --action-message-bg: var(--color-background-secondary, var(--color-background, #16171a)) !important;
       }
 
       .Button.round:not(:active):hover,
@@ -2215,19 +2695,71 @@
         background-color: var(--color-chat-active, #2b3d58) !important;
       }
 
-      /* Плашки дат и сервисных сообщений (убираем зеленый оттенок Telegram) */
+      /* Плашки дат и сервисных сообщений: сам ActionMessage прозрачен, красится только короткая плашка внутри */
+      .ActionMessage {
+        background: transparent !important;
+        background-color: transparent !important;
+        border: none !important;
+        box-shadow: none !important;
+      }
+
       .sticky-date > span,
       .local-action-message > span,
       .ActionMessage > span,
+      .ActionMessage [class*="textContent"],
+      .ActionMessage [class*="contentBox"],
       .message-date-group > span,
       .unread-messages-count {
-        background-color: rgba(22, 23, 26, 0.78) !important;
-        background: rgba(22, 23, 26, 0.78) !important;
+        background-color: var(--color-background-secondary, var(--color-background, #16171a)) !important;
+        background: var(--color-background-secondary, var(--color-background, #16171a)) !important;
         color: var(--color-text, #f3f4f6) !important;
         backdrop-filter: blur(12px) !important;
         -webkit-backdrop-filter: blur(12px) !important;
-        border: 1px solid rgba(255, 255, 255, 0.06) !important;
+        border: 1px solid rgba(255, 255, 255, 0.08) !important;
+        border-radius: var(--border-radius-messages, 1rem) !important;
+        padding: 0.25rem 0.625rem !important;
         font-weight: 500 !important;
+      }
+
+      /* Архив: убираем лишний фон аватарки при наведении */
+      .chat-item-archive [class*="avatarWrapper"],
+      .chat-item-archive .status {
+        background: transparent !important;
+        background-color: transparent !important;
+      }
+
+      /* Иконки в кнопках: настраиваются пользователем через отдельный ргб-пикер (--color-icon-buttons) */
+      .Button:not(.primary):not(.danger) .icon,
+      .Button:not(.primary):not(.danger) i.icon,
+      button:not(.primary):not(.danger) .icon,
+      button:not(.primary):not(.danger) i.icon,
+      .btnIcon,
+      [class*="btnIcon"],
+      [class*="actionBtn"] .icon,
+      [class*="actionBtn"] i.icon,
+      [class*="actionBtn"] svg {
+        color: var(--color-icon-buttons, var(--color-icon-secondary, #9da7b7)) !important;
+      }
+      .Button.primary .icon,
+      .Button.primary i.icon,
+      button.primary .icon,
+      button.primary i.icon {
+        color: var(--color-white, #ffffff) !important;
+      }
+      .Button.danger .icon,
+      .Button.danger i.icon {
+        color: var(--color-error, #ff595a) !important;
+      }
+      .Button.activated .icon,
+      .Button.active .icon {
+        color: var(--button-active-text-color, var(--color-primary)) !important;
+      }
+
+      /* TabList: фон активного индикатора непрозрачный, чтобы текст базового слоя не просвечивал */
+      .TabList [class*="activeIndicator"],
+      [class*="TabList"] [class*="activeIndicator"] {
+        background-color: color-mix(in srgb, var(--color-primary) 24%, var(--color-background, #16171a)) !important;
+        background: color-mix(in srgb, var(--color-primary) 24%, var(--color-background, #16171a)) !important;
       }
 
       /* Стили кастомного тултипа Telegram */
@@ -2262,74 +2794,7 @@
     const style = ensureModStyle();
     style.textContent = css.join('\n');
 
-    // --- ДИАГНОСТИКА: логируем реальные computed-стили footer и Composer ---
-    setTimeout(() => {
-      const diag = () => {
-        const footer = document.querySelector('.middle-column-footer');
-        const composer = footer && footer.querySelector('.Composer');
-        const wrapper = composer && composer.querySelector('.composer-wrapper');
-        const header = document.querySelector('.MiddleHeader');
-        const transition = document.querySelector('#MiddleColumn .Transition');
-        const slide = transition && transition.querySelector('.Transition_slide');
-
-        if (footer) {
-          const fs = getComputedStyle(footer);
-          const cs = composer ? getComputedStyle(composer) : null;
-          const ws = wrapper ? getComputedStyle(wrapper) : null;
-          const hs = header ? getComputedStyle(header) : null;
-          const ts = transition ? getComputedStyle(transition) : null;
-          const ss = slide ? getComputedStyle(slide) : null;
-
-          console.log('[ethernet DIAG] MiddleHeader:', {
-            width: hs?.width, left: hs?.left, right: hs?.right, position: hs?.position,
-            maxWidth: hs?.maxWidth, margin: hs?.margin,
-          });
-          console.log('[ethernet DIAG] .Transition:', {
-            width: ts?.width, position: ts?.position, overflow: ts?.overflow,
-          });
-          console.log('[ethernet DIAG] .Transition_slide:', {
-            width: ss?.width, position: ss?.position, display: ss?.display,
-            alignItems: ss?.alignItems, flexDirection: ss?.flexDirection,
-          });
-          console.log('[ethernet DIAG] .middle-column-footer:', {
-            width: fs.width, left: fs.left, right: fs.right, position: fs.position,
-            maxWidth: fs.maxWidth, display: fs.display, padding: fs.padding,
-            margin: fs.margin, boxSizing: fs.boxSizing,
-            offsetWidth: footer.offsetWidth,
-            parentOffsetWidth: footer.offsetParent?.offsetWidth,
-            containingBlockClass: footer.offsetParent?.className,
-          });
-          console.log('[ethernet DIAG] .Composer:', {
-            width: cs?.width, maxWidth: cs?.maxWidth, flex: cs?.flex,
-            display: cs?.display, boxSizing: cs?.boxSizing,
-            offsetWidth: composer?.offsetWidth,
-          });
-          console.log('[ethernet DIAG] .composer-wrapper:', {
-            width: ws?.width, maxWidth: ws?.maxWidth, flex: ws?.flex,
-            offsetWidth: wrapper?.offsetWidth,
-          });
-        } else {
-          console.log('[ethernet DIAG] No .middle-column-footer found');
-        }
-      };
-      // Запустить через 3 секунды после DOM ready, чтобы всё точно было на месте
-      setTimeout(diag, 3000);
-      // И повторить через 8 секунд
-      setTimeout(diag, 8000);
-    }, 1000);
-
     applyWallpaper(mod);
-
-    // Динамическая синхронизация геометрии левой панели через CSS-переменную
-    setInterval(() => {
-      const leftCol = document.getElementById('LeftColumn');
-      if (leftCol && leftCol.offsetWidth > 0) {
-        const w = `${leftCol.offsetWidth}px`;
-        if (document.documentElement.style.getPropertyValue('--left-column-custom-width') !== w) {
-          document.documentElement.style.setProperty('--left-column-custom-width', w);
-        }
-      }
-    }, 50);
   }
 
   // --- Обои: гарантированный изолированный слой под приложением ---
@@ -2394,99 +2859,85 @@
 
     if (isVideo) {
       layer.style.backgroundImage = '';
-      const existingVideos = layer.querySelectorAll('video');
-      const needsInit = existingVideos.length < 2 || existingVideos[0].getAttribute('src') !== url;
+      const existingVideo = layer.querySelector('video');
+      const needsInit = !existingVideo || existingVideo.getAttribute('src') !== url;
 
       if (needsInit) {
         layer.innerHTML = '';
+        const video = document.createElement('video');
+        video.className = 'ethernet-video-track';
+        video.src = url;
+        video.autoplay = true;
+        video.loop = true;
+        video.muted = true;
+        video.playsInline = true;
+        video.setAttribute('autoplay', 'true');
+        video.setAttribute('loop', 'true');
+        video.setAttribute('muted', 'true');
+        video.setAttribute('playsinline', 'true');
+        video.style.position = 'absolute';
+        video.style.inset = '0';
+        video.style.width = '100%';
+        video.style.height = '100%';
+        video.style.objectFit = 'cover';
+        video.style.pointerEvents = 'none';
 
-        // Бесшовная двухбуферная система: плеер А и плеер B плавно сменяют друг друга до достижения конца файла
-        const vA = document.createElement('video');
-        const vB = document.createElement('video');
+        const canvas = document.createElement('canvas');
+        canvas.className = 'ethernet-video-canvas';
+        canvas.style.position = 'absolute';
+        canvas.style.inset = '0';
+        canvas.style.width = '100%';
+        canvas.style.height = '100%';
+        canvas.style.objectFit = 'cover';
+        canvas.style.pointerEvents = 'none';
 
-        [vA, vB].forEach((v, idx) => {
-          v.className = 'ethernet-video-track';
-          v.src = url;
-          v.muted = true;
-          v.playsInline = true;
-          v.setAttribute('muted', 'true');
-          v.setAttribute('playsinline', 'true');
-          v.style.position = 'absolute';
-          v.style.inset = '0';
-          v.style.width = '100%';
-          v.style.height = '100%';
-          v.style.objectFit = 'cover';
-          v.style.pointerEvents = 'none';
-          v.style.transition = 'opacity 0.2s ease-in-out';
-          v.style.opacity = idx === 0 ? '1' : '0';
-          layer.appendChild(v);
+        const ctx = canvas.getContext('2d', { alpha: false });
+        let isLoopingFrame = true;
+
+        const drawFrame = () => {
+          if (!isLoopingFrame || !canvas.isConnected) return;
+          if (video.videoWidth > 0 && video.videoHeight > 0) {
+            if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
+              canvas.width = video.videoWidth;
+              canvas.height = video.videoHeight;
+            }
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+          }
+          if ('requestVideoFrameCallback' in video) {
+            video.requestVideoFrameCallback(drawFrame);
+          } else {
+            requestAnimationFrame(drawFrame);
+          }
+        };
+
+        const tryPlay = () => {
+          if (video.paused) {
+            video.play().catch(() => {});
+          }
+        };
+
+        video.addEventListener('canplay', () => {
+          tryPlay();
+          drawFrame();
+        });
+        video.addEventListener('loadeddata', () => {
+          tryPlay();
+          drawFrame();
         });
 
-        let active = vA;
-        let standby = vB;
-        let isSwitching = false;
-
-        const startTrack = (v) => {
-          try {
-            v.currentTime = 0;
-            v.playbackRate = 1.0;
-            const p = v.play();
-            if (p !== undefined) p.catch(() => { });
-          } catch { }
-        };
-
-        startTrack(active);
-
-        // Высокоточный кадровый монитор (60 FPS requestAnimationFrame)
-        let rafId = null;
-        const checkSeamlessLoop = () => {
-          if (!active || !active.isConnected) return;
-
-          const dur = active.duration;
-          if (dur && dur > 0.4) {
-            const timeLeft = dur - active.currentTime;
-
-            // За 0.2 сек до конца или при неожиданной остановке — плавно переключаем на второй буфер
-            if ((timeLeft <= 0.2 || active.ended || (active.paused && !document.hidden)) && !isSwitching) {
-              isSwitching = true;
-
-              startTrack(standby);
-              standby.style.opacity = '1';
-              active.style.opacity = '0';
-
-              setTimeout(() => {
-                try {
-                  active.pause();
-                  active.currentTime = 0;
-                } catch { }
-                const tmp = active;
-                active = standby;
-                standby = tmp;
-                isSwitching = false;
-              }, 200);
-            }
-          } else if (active.ended || (active.paused && !document.hidden)) {
-            startTrack(active);
-          }
-
-          rafId = requestAnimationFrame(checkSeamlessLoop);
-        };
-
-        rafId = requestAnimationFrame(checkSeamlessLoop);
-
-        // Быстрое пробуждение при фокусе и возврате в окно
         const handleWakeup = () => {
-          if (!active) return;
-          if (active.paused || active.ended) {
-            active.play().catch(() => { });
+          if (!document.hidden && video.paused) {
+            video.play().catch(() => {});
           }
         };
 
         window.addEventListener('focus', handleWakeup);
         window.addEventListener('pageshow', handleWakeup);
-        document.addEventListener('visibilitychange', () => {
-          if (!document.hidden) handleWakeup();
-        });
+        document.addEventListener('visibilitychange', handleWakeup);
+
+        layer.appendChild(canvas);
+        layer.appendChild(video);
+        tryPlay();
       }
     } else {
       layer.innerHTML = '';
@@ -2696,7 +3147,7 @@
           </svg>
         </div>
       </div>
-      <div class="ethernet-titlebar-center" id="ethernet-titlebar-text"></div>
+      <div class="ethernet-titlebar-center" id="ethernet-titlebar-text">ethernet</div>
       <div class="ethernet-titlebar-controls">
         <button class="ethernet-titlebar-btn" id="ethernet-btn-min" title="Свернуть">
           <svg viewBox="0 0 10 10" width="10" height="10">
@@ -2763,8 +3214,14 @@
     const updateTitle = () => {
       if (titleText) {
         let t = document.title || '';
-        t = t.replace(/\s*·\s*Telegram/gi, '').trim();
-        if (t === 'Ethernet' || t === 'Telegram') t = '';
+        t = t.replace(/\s*·\s*Telegram(\s+Beta)?/gi, '')
+             .replace(/\s*·\s*Ethernet/gi, '')
+             .replace(/\s*·\s*ethernet/gi, '')
+             .replace(/\s*\[Inactive\]/gi, '')
+             .trim();
+        if (!t || /^(telegram(\s+beta)?|ethernet)$/i.test(t)) {
+          t = 'ethernet';
+        }
         titleText.textContent = t;
       }
     };

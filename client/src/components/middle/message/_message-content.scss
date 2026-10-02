@@ -512,12 +512,12 @@
 
   .svg-appendix {
     position: absolute;
-    bottom: -0.0625rem;
+    bottom: 0;
 
-    overflow: hidden;
+    overflow: visible;
 
     width: 0.5625rem;
-    height: 1.125rem;
+    height: 1.0625rem;
 
     font-size: 1rem !important;
 
@@ -526,11 +526,10 @@
     }
 
     .Message.own & {
-      right: -0.551rem;
+      right: -0.5625rem;
       left: auto;
       color: var(--color-background-own);
 
-      .corner,
       .corner-right {
         display: block;
         fill: var(--color-background-own);
@@ -541,11 +540,10 @@
     }
 
     .Message:not(.own) & {
-      left: -0.562rem;
       right: auto;
+      left: -0.5625rem;
       color: var(--color-background-secondary);
 
-      .corner,
       .corner-left {
         display: block;
         fill: var(--color-background-secondary);
@@ -557,8 +555,10 @@
   }
 
   &[data-has-custom-appendix] {
-    .svg-appendix .corner {
-      fill: var(--appendix-bg);
+    .svg-appendix .corner,
+    .svg-appendix .corner-left,
+    .svg-appendix .corner-right {
+      fill: var(--appendix-bg) !important;
     }
   }
 
@@ -574,7 +574,16 @@
   }
 
   &.document {
+    width: max-content;
+    max-width: var(--max-width, 29rem);
+
+    .is-in-document-group & {
+      width: min(var(--max-width, 29rem), 100%) !important;
+      min-width: min(var(--max-width, 29rem), 100%) !important;
+    }
+
     .File {
+      max-width: 100%;
       margin-top: calc(0.5rem - 0.3125rem);
       margin-bottom: calc(0.5rem - 0.3125rem);
 

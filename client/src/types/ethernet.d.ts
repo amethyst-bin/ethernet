@@ -1,5 +1,6 @@
 export type HermesRadii = {
   ui?: number;
+  foldersSidebar?: number;
   messages?: number;
   buttons?: number;
   avatars?: number;
@@ -28,6 +29,7 @@ export type HermesMod = {
   wallpaperFile?: string;
   wallpaperKind?: 'image' | 'video';
   wallpaperOriginalPath?: string;
+  customCss?: string;
 };
 
 export type EthernetMod = HermesMod;
@@ -49,7 +51,7 @@ export interface HermesDesktopApi {
   reload: () => Promise<void>;
   modGet: () => Promise<HermesMod | null>;
   modSet: (mod: HermesMod) => Promise<HermesMod>;
-  wallpaperSetFile: (payload: { name: string; base64: string; originalPath?: string; themeName?: string }) => Promise<{ slug?: string; file?: string; originalPath?: string }>;
+  wallpaperSetFile: (payload: { name: string; base64: string; path?: string; originalPath?: string; themeName?: string }) => Promise<{ slug?: string; file?: string; originalPath?: string }>;
   wallpaperClear: () => Promise<boolean>;
   windowMinimize: () => Promise<boolean>;
   windowMaximizeToggle: () => Promise<boolean>;
@@ -66,10 +68,13 @@ export interface HermesDesktopApi {
     isSilent?: boolean;
   }) => Promise<boolean>;
   onNotificationClick?: (cb: (data: { chatId?: string; messageId?: number }) => void) => () => void;
+  onNotificationsDisabledChange?: (cb: (disabled: boolean) => void) => () => void;
   notificationsDisabledGet?: () => Promise<boolean>;
   notificationsDisabledSet?: (disabled: boolean) => Promise<boolean>;
   closeToTrayDisabledGet?: () => Promise<boolean>;
   closeToTrayDisabledSet?: (disabled: boolean) => Promise<boolean>;
+  setUnreadCount?: (count: number) => Promise<boolean>;
+  networkGeoInfo?: () => Promise<any>;
   safeModeGet?: () => Promise<boolean>;
   safeModeSet?: (enabled: boolean) => Promise<boolean>;
   lastCrashedPluginGet?: () => Promise<{ id: string; error: string; time: number } | null>;

@@ -51,7 +51,7 @@ function handleErrorEvent(e: ErrorEvent | PromiseRejectionEvent) {
     }
 
     // Flood wait errors
-    if (e.message.includes('A wait of')) {
+    if (e.message?.includes('A wait of')) {
       return;
     }
   }

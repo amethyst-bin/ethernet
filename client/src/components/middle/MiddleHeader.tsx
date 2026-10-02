@@ -49,6 +49,7 @@ import GroupChatInfo from '../common/GroupChatInfo';
 import PrivateChatInfo from '../common/PrivateChatInfo';
 import UnreadCounter from '../common/UnreadCounter';
 import Button from '../ui/Button';
+import Icon from '../common/icons/Icon';
 import Transition from '../ui/Transition';
 import HeaderActions from './HeaderActions';
 
@@ -95,6 +96,7 @@ const MiddleHeader = ({
   typingStatusByPeerId,
   isSelectModeActive,
   isLeftColumnShown,
+  isRightColumnShown,
   chat,
   messagesCount,
   isComments,
@@ -113,6 +115,7 @@ const MiddleHeader = ({
 }: OwnProps & StateProps) => {
   const {
     openThreadWithInfo,
+    toggleChatInfo,
     openChat,
     openPreviousChat,
     toggleLeftColumn,
@@ -142,8 +145,12 @@ const MiddleHeader = ({
   const handleOpenChat = useLastCallback((event: React.MouseEvent | React.TouchEvent) => {
     if ((event.target as Element).closest('.title > .custom-emoji')) return;
 
-    // Force close My Profile if clicked on Saved Messages header
-    openThreadWithInfo({ chatId, threadId, isOwnProfile: false });
+    if (isRightColumnShown) {
+      toggleChatInfo({ force: false });
+    } else {
+      // Force close My Profile if clicked on Saved Messages header
+      openThreadWithInfo({ chatId, threadId, isOwnProfile: false });
+    }
   });
 
   const {

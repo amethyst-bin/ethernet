@@ -163,6 +163,11 @@ const DocumentationModal: FC<OwnProps> = ({
                         <td>#d4d4d4</td>
                       </tr>
                       <tr>
+                        <td>--color-icon-buttons</td>
+                        <td>Цвет иконок в кнопках и действиях</td>
+                        <td>#9da7b7</td>
+                      </tr>
+                      <tr>
                         <td>--color-borders</td>
                         <td>Границы и контуры элементов</td>
                         <td>#1f1f1f</td>

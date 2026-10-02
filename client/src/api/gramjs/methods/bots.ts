@@ -546,7 +546,7 @@ export async function invokeWebViewCustomMethod({
   } catch (e) {
     const error = e as Error;
     return {
-      error: error.message,
+      error: error?.message || String(e),
     };
   }
 }

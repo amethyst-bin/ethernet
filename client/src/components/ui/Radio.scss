@@ -1,5 +1,37 @@
+.radio-group {
+  user-select: none !important;
+  -webkit-user-select: none !important;
+
+  &, & * {
+    user-select: none !important;
+    -webkit-user-select: none !important;
+  }
+
+  &::selection,
+  *::selection {
+    background: transparent !important;
+    color: inherit !important;
+  }
+}
+
 .Radio {
   cursor: var(--custom-cursor, pointer);
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  -webkit-tap-highlight-color: transparent !important;
+  outline: none !important;
+
+  &, & * {
+    user-select: none !important;
+    -webkit-user-select: none !important;
+    -webkit-tap-highlight-color: transparent !important;
+  }
+
+  &::selection,
+  *::selection {
+    background: transparent !important;
+    color: inherit !important;
+  }
 
   position: relative;
 
@@ -68,6 +100,12 @@
     position: absolute;
     z-index: var(--z-below);
     opacity: 0;
+    outline: none !important;
+
+    &:focus,
+    &:focus-visible {
+      outline: none !important;
+    }
   }
 
   .Radio-main {
@@ -134,7 +172,28 @@
     }
   }
 
+  .Radio-main {
+    background: transparent !important;
+    background-color: transparent !important;
+
+    .label,
+    .subLabel {
+      background: transparent !important;
+      background-color: transparent !important;
+    }
+  }
+
+  input:checked + .Radio-main,
   input:checked ~ .Radio-main {
+    background: transparent !important;
+    background-color: transparent !important;
+
+    .label,
+    .subLabel {
+      background: transparent !important;
+      background-color: transparent !important;
+    }
+
     &::before {
       border-color: var(--color-primary);
     }

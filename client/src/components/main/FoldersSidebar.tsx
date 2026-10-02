@@ -1,4 +1,7 @@
-import { memo, useEffect, useLayoutEffect, useMemo, useRef } from '@teact';
+import type { TeactNode } from '@teact';
+import {
+  memo, useEffect, useLayoutEffect, useMemo, useRef, useState,
+} from '@teact';
 import { getActions, withGlobal } from '../../global';
 
 import type { ApiChatFolder, ApiChatlistExportedInvite } from '../../api/types';
@@ -20,6 +23,7 @@ import useScrolledState from '../../hooks/useScrolledState';
 import MainMenuDropdown from '../common/MainMenuDropdown';
 import Button from '../ui/Button';
 import Folder from '../ui/Folder';
+import Portal from '../ui/Portal';
 
 import styles from './FoldersSidebar.module.scss';
 
@@ -96,6 +100,33 @@ const FoldersSidebar = ({
 
   const lang = useLang();
 
+  const [hoveredFolder, setHoveredFolder] = useState<{
+    title: TeactNode;
+    badgeCount?: number;
+    isBadgeActive?: boolean;
+    top: number;
+    left: number;
+  } | undefined>();
+
+  const handleFolderMouseEnter = useLastCallback((
+    title: TeactNode,
+    badgeCount?: number,
+    isBadgeActive?: boolean,
+  ) => (element: HTMLDivElement) => {
+    const rect = element.getBoundingClientRect();
+    setHoveredFolder({
+      title,
+      badgeCount,
+      isBadgeActive,
+      top: Math.round(rect.top + rect.height / 2),
+      left: Math.round(rect.right + 10),
+    });
+  });
+
+  const handleFolderMouseLeave = useLastCallback(() => {
+    setHoveredFolder(undefined);
+  });
+
   useLayoutEffect(() => {
     const tabsEl = tabsRef.current;
     if (!tabsEl) return;
@@ -104,17 +135,18 @@ const FoldersSidebar = ({
       const activeEl = tabsEl.children[activeChatFolder] as HTMLElement | undefined;
       if (!activeEl || activeEl === pillRef.current) return;
 
-      const top = activeEl.offsetTop;
-      const height = activeEl.offsetHeight;
+      const slotHeight = activeEl.offsetHeight || 44;
+      const circleSize = 36;
+      const top = activeEl.offsetTop + (slotHeight - circleSize) / 2;
 
       requestMutation(() => {
         tabsEl.style.setProperty('--pill-offset', `${top}px`);
-        tabsEl.style.setProperty('--pill-height', `${height}px`);
       });
     });
   }, [activeChatFolder, folderTabs]);
 
   const handleSwitchTab = useLastCallback((index: number) => {
+    setHoveredFolder(undefined);
     openLeftColumnContent({ contentKey: LeftColumnContent.ChatList });
     openSettingsScreen({ screen: undefined });
     setActiveChatFolder({ activeChatFolder: index }, { forceOnHeavyAnimation: true });
@@ -123,6 +155,13 @@ const FoldersSidebar = ({
     }
 
     tabsRef.current?.children[index]?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  });
+
+  const handleTabsScroll = useLastCallback((e: React.UIEvent<HTMLDivElement>) => {
+    if (hoveredFolder) {
+      setHoveredFolder(undefined);
+    }
+    handleScroll(e);
   });
 
   const handleSettingsClick = useLastCallback(() => {
@@ -171,7 +210,7 @@ const FoldersSidebar = ({
       <div
         ref={tabsRef}
         className={buildClassName(styles.tabs, 'custom-scroll', 'no-scrollbar')}
-        onScroll={handleScroll}
+        onScroll={handleTabsScroll}
       >
         {folderTabs?.map((tab, i) => (
           <Folder
@@ -183,6 +222,8 @@ const FoldersSidebar = ({
             isBadgeActive={tab.isBadgeActive}
             onClick={handleSwitchTab}
             clickArg={i}
+            onMouseEnter={handleFolderMouseEnter(tab.title, tab.badgeCount, tab.isBadgeActive)}
+            onMouseLeave={handleFolderMouseLeave}
             contextActions={tab.contextActions}
             contextRootElementSelector="#FoldersSidebar"
             icon={tab.emoticon}
@@ -199,6 +240,22 @@ const FoldersSidebar = ({
         iconName="tools"
         iconClassName={styles.icon}
       />
+
+      {hoveredFolder && (
+        <Portal>
+          <div
+            className={styles.folderTooltip}
+            style={`top: ${hoveredFolder.top}px; left: ${hoveredFolder.left}px;`}
+          >
+            <span>{hoveredFolder.title}</span>
+            {Boolean(hoveredFolder.badgeCount) && (
+              <span className={buildClassName(styles.tooltipBadge, hoveredFolder.isBadgeActive && styles.badgeActive)}>
+                {hoveredFolder.badgeCount}
+              </span>
+            )}
+          </div>
+        </Portal>
+      )}
     </div>
   );
 };

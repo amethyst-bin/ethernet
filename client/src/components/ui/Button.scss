@@ -78,6 +78,23 @@
       display: inline;
     }
 
+    .icon {
+      color: var(--color-icon-buttons, var(--color-icon-secondary, var(--color-text, #ffffff)));
+    }
+
+    &.primary .icon {
+      color: var(--color-white, #ffffff) !important;
+    }
+
+    &.danger .icon {
+      color: var(--color-error, #ff595a) !important;
+    }
+
+    &.activated .icon,
+    &.active .icon {
+      color: var(--button-active-text-color, var(--color-primary)) !important;
+    }
+
     &.disabled {
       cursor: var(--custom-cursor, default);
 

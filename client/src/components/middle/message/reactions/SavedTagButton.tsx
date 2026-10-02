@@ -114,6 +114,7 @@ const SavedTagButton = ({
         className,
       )}
       size="tiny"
+      color="translucent"
       onClick={handleClick}
       onMouseDown={handleBeforeContextMenu}
       onContextMenu={handleContextMenu}

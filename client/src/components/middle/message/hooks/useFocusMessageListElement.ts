@@ -55,7 +55,7 @@ export default function useFocusMessageListElement({
       if (!messagesContainer) return;
 
       // `noFocusHighlight` is always called with “scroll-to-bottom” buttons
-      const isToBottom = noFocusHighlight;
+      const isToBottom = Boolean(noFocusHighlight) && (scrollTargetPosition === undefined || scrollTargetPosition === 'end');
       const scrollPosition = scrollTargetPosition || (isToBottom ? 'end' : 'centerOrTop');
 
       const exec = () => {
@@ -70,17 +70,22 @@ export default function useFocusMessageListElement({
         const bottomReserve = getEffectiveMessageListBottomReserve(messagesContainer);
         const marginReserve = scrollPosition === 'end' ? bottomReserve : topReserve;
 
+        const targetElement = isToBottom
+          ? (messagesContainer.querySelector<HTMLElement>('.fab-trigger') || elementRef.current!)
+          : elementRef.current!;
+
         const result = animateScroll({
           container: messagesContainer,
-          element: elementRef.current!,
+          element: targetElement,
           position: scrollPosition,
           margin: (isToBottom ? BOTTOM_FOCUS_MARGIN : FOCUS_MARGIN) + marginReserve,
           topReserve,
           bottomReserve,
           maxDistance,
           forceDirection: focusDirection,
-          forceNormalContainerHeight: isResizingContainer && !isSendCollapsePhaseActive(messagesContainer),
+          forceNormalContainerHeight: !isToBottom && isResizingContainer && !isSendCollapsePhaseActive(messagesContainer),
           shouldReturnMutationFn: true,
+          isScrollToBottom: isToBottom,
         });
 
         if (isQuote) {
@@ -95,7 +100,7 @@ export default function useFocusMessageListElement({
         return result;
       };
 
-      if (isRelocated) {
+      if (isRelocated || isToBottom) {
         // We need this to override scroll setting from Message List layout effect
         requestAfterMessageListReflow(exec);
       } else {

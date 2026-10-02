@@ -267,7 +267,7 @@ export function callApi<T extends keyof Methods>(fnName: T, ...args: MethodArgs<
     args,
   });
 
-  if (fnName === 'sendMessage' || fnName === 'sendMedia' || fnName === 'forwardMessages') {
+  if (fnName === 'sendMessage' || fnName === 'forwardMessages') {
     if (isGhostActionBlocked('autoOffline')) {
       promise.finally(() => {
         setTimeout(() => {
@@ -369,7 +369,10 @@ function subscribeToWorker(onUpdate: OnApiUpdate) {
       } else if (payload.type === 'unhandledError') {
         const message = payload.error?.message;
         if (message && IGNORE_UNHANDLED_ERRORS.has(message)) return;
-        throw new Error(message);
+        if (DEBUG) {
+          // eslint-disable-next-line no-console
+          console.warn('[GramJS unhandled error]:', message);
+        }
       } else if (payload.type === 'sendBeacon') {
         navigator.sendBeacon(payload.url, payload.data);
       } else if (payload.type === 'debugLog') {

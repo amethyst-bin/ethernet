@@ -931,7 +931,7 @@ const Message = ({
     && !isTouchScreen && !phoneCall && !isInSelectMode && defaultReaction
     && !isInDocumentGroupNotLast && !isStoryMention && !hasTtl && !isAccountFrozen;
 
-  const hasOutsideReactions = !withVoiceTranscription && hasReactions
+  const hasOutsideReactions = !withVoiceTranscription && hasReactions && !withCommentButton
     && (isCustomShape || (
       (photo || video || storyData || (location?.mediaType === 'geo')) && (!hasText || isInvertedMedia))
     );
@@ -1592,7 +1592,7 @@ const Message = ({
         {hasContentAfterText && (
           <>
             {renderInvertibleMediaContent(hasCustomAppendix)}
-            {!hasAnimatedEmoji && (
+            {!hasAnimatedEmoji && (hasFactCheck || isMetaInText) && (
               <div className={footerClass} dir="auto">
                 {hasFactCheck && (
                   <FactCheck factCheck={factCheck} isToggleDisabled={isInSelectMode} />
@@ -2052,6 +2052,18 @@ const Message = ({
               </div>
             </div>
           )}
+          {reactionsPosition === 'outside' && !isStoryMention && withCommentButton && (
+            <Reactions
+              message={reactionMessage!}
+              threadId={threadId}
+              isOutside
+              isCurrentUserPremium={isPremium}
+              observeIntersection={observeIntersectionForPlaying}
+              noRecentReactors={isChannel}
+              tags={tags}
+              isAccountFrozen={isAccountFrozen}
+            />
+          )}
           {withCommentButton && !isCustomShape && (
             <CommentButton
               threadInfo={commentsThreadInfo}
@@ -2076,7 +2088,7 @@ const Message = ({
             onClick={handleLocalInlineButtonClick}
           />
         )}
-        {reactionsPosition === 'outside' && !isStoryMention && (
+        {reactionsPosition === 'outside' && !isStoryMention && !withCommentButton && (
           <Reactions
             message={reactionMessage!}
             threadId={threadId}

@@ -1,5 +1,6 @@
 const { app, BrowserWindow, protocol, net, shell, nativeTheme, Menu, Tray, nativeImage, globalShortcut, screen, ipcMain } = require('electron');
 const { pathToFileURL } = require('url');
+const { Readable } = require('stream');
 const fs = require('fs');
 const path = require('path');
 
@@ -24,6 +25,9 @@ const hermesSettings = require('./hermes-settings.cjs');
 // Полностью отключаем стандартное меню Electron (File, Edit, View, Window)
 Menu.setApplicationMenu(null);
 
+// Отключаем DnsOverHttps в Chromium, чтобы запросы шли через системный DNS и TUN-прокси (NekoRay, Happ, Clash)
+app.commandLine.appendSwitch('disable-features', 'DnsOverHttps');
+
 const isPackaged = app.isPackaged;
 const DIST = path.join(__dirname, '..', 'dist');
 const ROOT = process.env.PORTABLE_EXECUTABLE_DIR || (process.env.APPIMAGE ? path.dirname(process.env.APPIMAGE) : (isPackaged ? path.dirname(process.execPath) : path.join(__dirname, '..', '..')));
@@ -32,10 +36,74 @@ const PLUGINS_DIR = path.join(ROOT, 'plugins');
 const WALLPAPERS_DIR = path.join(ROOT, 'wallpapers');
 const LOADER_PATH = path.join(__dirname, 'loader.js');
 
+function seedDefaultAssets() {
+  try {
+    const candidates = [
+      path.join(__dirname, '..', 'assets-bundle'),
+      process.resourcesPath ? path.join(process.resourcesPath, 'assets-bundle') : null,
+      path.join(__dirname, '..', '..', 'assets-bundle'),
+    ].filter(Boolean);
+
+    const bundleDir = candidates.find((dir) => fs.existsSync(dir));
+    if (!bundleDir) return;
+
+    if (!fs.existsSync(THEMES_DIR)) fs.mkdirSync(THEMES_DIR, { recursive: true });
+    if (!fs.existsSync(PLUGINS_DIR)) fs.mkdirSync(PLUGINS_DIR, { recursive: true });
+    if (!fs.existsSync(WALLPAPERS_DIR)) fs.mkdirSync(WALLPAPERS_DIR, { recursive: true });
+
+    // 1. Settings
+    const rootSettings = path.join(ROOT, 'ethernet-settings.json');
+    const bundleSettings = path.join(bundleDir, 'ethernet-settings.json');
+    if (!fs.existsSync(rootSettings) && fs.existsSync(bundleSettings)) {
+      try { fs.copyFileSync(bundleSettings, rootSettings); } catch {}
+    }
+
+    // 2. Themes
+    const bundleThemes = path.join(bundleDir, 'themes');
+    if (fs.existsSync(bundleThemes)) {
+      const themes = fs.readdirSync(bundleThemes);
+      for (const t of themes) {
+        const dest = path.join(THEMES_DIR, t);
+        if (!fs.existsSync(dest)) {
+          try { fs.copyFileSync(path.join(bundleThemes, t), dest); } catch {}
+        }
+      }
+    }
+
+    // 3. Wallpapers
+    const bundleWallpapers = path.join(bundleDir, 'wallpapers');
+    if (fs.existsSync(bundleWallpapers)) {
+      const wps = fs.readdirSync(bundleWallpapers);
+      for (const w of wps) {
+        const dest = path.join(WALLPAPERS_DIR, w);
+        if (!fs.existsSync(dest)) {
+          try { fs.copyFileSync(path.join(bundleWallpapers, w), dest); } catch {}
+        }
+      }
+    }
+
+    // 4. Plugins
+    const bundlePlugins = path.join(bundleDir, 'plugins');
+    if (fs.existsSync(bundlePlugins)) {
+      const plugins = fs.readdirSync(bundlePlugins);
+      for (const p of plugins) {
+        const srcP = path.join(bundlePlugins, p);
+        const destP = path.join(PLUGINS_DIR, p);
+        if (fs.statSync(srcP).isDirectory() && !fs.existsSync(destP)) {
+          try { fs.cpSync(srcP, destP, { recursive: true }); } catch {}
+        }
+      }
+    }
+  } catch (err) {
+    console.error('[Asset Seeding Error]', err);
+  }
+}
+
 try {
   if (!fs.existsSync(THEMES_DIR)) fs.mkdirSync(THEMES_DIR, { recursive: true });
   if (!fs.existsSync(PLUGINS_DIR)) fs.mkdirSync(PLUGINS_DIR, { recursive: true });
   if (!fs.existsSync(WALLPAPERS_DIR)) fs.mkdirSync(WALLPAPERS_DIR, { recursive: true });
+  seedDefaultAssets();
 } catch {}
 
 // Регистрируем кастомный протокол как стандартный, безопасный и поддерживающий fetch/WASM/Workers
@@ -142,7 +210,7 @@ function registerAppProtocol() {
           const safeThemeName = path.basename(rawName);
           const target = path.normalize(path.join(THEMES_DIR, `${safeThemeName}.css`));
           const resolvedThemes = path.resolve(THEMES_DIR);
-          if (target.startsWith(resolvedThemes + path.sep) && fs.existsSync(target)) {
+          if (target.toLowerCase().startsWith((resolvedThemes + path.sep).toLowerCase()) && fs.existsSync(target)) {
             return new Response(fs.readFileSync(target, 'utf8'), {
               headers: { 'content-type': 'text/css; charset=utf-8' },
             });
@@ -192,7 +260,7 @@ function registerAppProtocol() {
         const file = path.basename(decodeURIComponent(pathname));
         const target = path.normalize(path.join(WALLPAPERS_DIR, file));
         const resolvedWallpapers = path.resolve(WALLPAPERS_DIR);
-        if (target.startsWith(resolvedWallpapers + path.sep) && fs.existsSync(target)) {
+        if (target.toLowerCase().startsWith((resolvedWallpapers + path.sep).toLowerCase()) && fs.existsSync(target)) {
           const ext = path.extname(file).toLowerCase();
           const mimeTypes = {
             '.mp4': 'video/mp4',
@@ -204,12 +272,41 @@ function registerAppProtocol() {
             '.webp': 'image/webp',
           };
           const contentType = mimeTypes[ext] || 'application/octet-stream';
-          const buffer = fs.readFileSync(target);
-          return new Response(buffer, {
+          const stat = fs.statSync(target);
+          const totalSize = stat.size;
+          const rangeHeader = request.headers.get('range');
+
+          if (rangeHeader) {
+            const match = rangeHeader.match(/bytes=(\d+)-(\d*)/);
+            if (match) {
+              const start = parseInt(match[1], 10);
+              const end = match[2] ? parseInt(match[2], 10) : totalSize - 1;
+              if (start < totalSize && end >= start) {
+                const safeEnd = Math.min(end, totalSize - 1);
+                const chunkSize = safeEnd - start + 1;
+                const nodeStream = fs.createReadStream(target, { start, end: safeEnd });
+                const webStream = Readable.toWeb(nodeStream);
+                return new Response(webStream, {
+                  status: 206,
+                  headers: {
+                    'Content-Range': `bytes ${start}-${safeEnd}/${totalSize}`,
+                    'Accept-Ranges': 'bytes',
+                    'Content-Length': chunkSize.toString(),
+                    'Content-Type': contentType,
+                  },
+                });
+              }
+            }
+          }
+
+          const nodeStream = fs.createReadStream(target);
+          const webStream = Readable.toWeb(nodeStream);
+          return new Response(webStream, {
+            status: 200,
             headers: {
-              'content-type': contentType,
-              'content-length': buffer.length.toString(),
-              'accept-ranges': 'bytes',
+              'Accept-Ranges': 'bytes',
+              'Content-Length': totalSize.toString(),
+              'Content-Type': contentType,
             },
           });
         }
@@ -234,7 +331,7 @@ function registerAppProtocol() {
       const resolvedDist = path.resolve(DIST);
 
       // Защита от Path Traversal (выхода за пределы DIST)
-      if (!filePath.startsWith(resolvedDist + path.sep) && filePath !== resolvedDist) {
+      if (!filePath.toLowerCase().startsWith((resolvedDist + path.sep).toLowerCase()) && filePath.toLowerCase() !== resolvedDist.toLowerCase()) {
         return new Response('Forbidden', { status: 403 });
       }
 
@@ -255,7 +352,11 @@ function registerAppProtocol() {
         const inject = `<script src="/ethernet/loader.js"></script>`;
         if (!html.includes(inject)) html = html.replace('</head>', `${inject}\n</head>`);
         return new Response(html, {
-          headers: { 'content-type': 'text/html; charset=utf-8' },
+          headers: {
+            'content-type': 'text/html; charset=utf-8',
+            'x-content-type-options': 'nosniff',
+            'x-frame-options': 'SAMEORIGIN',
+          },
         });
       }
       return new Response('dist not built — run: npm run app:build', { status: 404 });
@@ -270,6 +371,7 @@ function createWindow() {
   const iconPath = path.join(__dirname, '..', 'ethernet.ico');
   const appIcon = fs.existsSync(iconPath) ? nativeImage.createFromPath(iconPath) : undefined;
   const win = new BrowserWindow({
+    title: 'ethernet',
     width: 1280,
     height: 832,
     minWidth: 480,
@@ -308,6 +410,20 @@ function createWindow() {
     if (!win.isDestroyed()) {
       win.webContents.send('hermes:window-maximized-changed', false);
     }
+  });
+
+  win.on('page-title-updated', (event, title) => {
+    event.preventDefault();
+    let clean = (title || '')
+      .replace(/\s*·\s*Telegram(\s+Beta)?/gi, '')
+      .replace(/\s*·\s*Ethernet/gi, '')
+      .replace(/\s*·\s*ethernet/gi, '')
+      .replace(/\s*\[Inactive\]/gi, '')
+      .trim();
+    if (!clean || /^(telegram(\s+beta)?|ethernet)$/i.test(clean)) {
+      clean = 'ethernet';
+    }
+    win.setTitle(clean);
   });
 
   win.webContents.on('before-input-event', (event, input) => {
@@ -469,7 +585,14 @@ function showTrayMenu(trayBounds) {
   win.focus();
 }
 
-ipcMain.on('tray:action-open', () => {
+function isTraySender(event) {
+  if (trayMenuWindow && !trayMenuWindow.isDestroyed() && event.sender === trayMenuWindow.webContents) return true;
+  const url = event.senderFrame?.url || (typeof event.sender?.getURL === 'function' ? event.sender.getURL() : '');
+  return url.includes('tray-menu.html');
+}
+
+ipcMain.on('tray:action-open', (event) => {
+  if (!isTraySender(event)) return;
   if (trayMenuWindow && !trayMenuWindow.isDestroyed()) trayMenuWindow.hide();
   if (!mainWindow || mainWindow.isDestroyed()) {
     mainWindow = createWindow();
@@ -480,7 +603,8 @@ ipcMain.on('tray:action-open', () => {
   }
 });
 
-ipcMain.on('tray:action-toggle-notifs', () => {
+ipcMain.on('tray:action-toggle-notifs', (event) => {
+  if (!isTraySender(event)) return;
   const nextVal = !hermesSettings.getNotificationsDisabled();
   hermesSettings.setNotificationsDisabled(nextVal);
   if (trayMenuWindow && !trayMenuWindow.isDestroyed()) {
@@ -493,7 +617,8 @@ ipcMain.on('tray:action-toggle-notifs', () => {
   updateTrayMenu();
 });
 
-ipcMain.on('tray:action-quit', () => {
+ipcMain.on('tray:action-quit', (event) => {
+  if (!isTraySender(event)) return;
   app.isQuitting = true;
   app.quit();
 });
@@ -537,7 +662,12 @@ function updateTaskbarBadge(count) {
   }
 }
 
-ipcMain.on('hermes:set-unread-count', (_e, count) => {
+ipcMain.on('hermes:set-unread-count', (event, count) => {
+  const senderUrl = event.senderFrame?.url || (typeof event.sender?.getURL === 'function' ? event.sender.getURL() : '');
+  if (!senderUrl.startsWith('app://telegram/')) {
+    console.warn(`[Security] Blocked unauthorized set-unread-count from '${senderUrl}'`);
+    return;
+  }
   updateTaskbarBadge(count);
 });
 
@@ -623,6 +753,71 @@ if (!gotTheLock) {
   const notificationManager = require('./notification-manager.cjs');
 
   app.whenReady().then(async () => {
+    // Ограничение разрешений (Permissions Request Handler)
+    const { session } = require('electron');
+    if (session && session.defaultSession) {
+      session.defaultSession.setPermissionRequestHandler((webContents, permission, callback) => {
+        const originUrl = webContents.getURL();
+        if (!originUrl.startsWith('app://telegram/')) {
+          return callback(false);
+        }
+        // Разрешаем только микрофон/камеру (для голосовых/видео сообщений и звонков), уведомления и полноэкранный режим
+        if (['media', 'notifications', 'fullscreen'].includes(permission)) {
+          return callback(true);
+        }
+        return callback(false);
+      });
+    }
+
+    // Глобальная защита для всех создаваемых окон и фреймов в приложении
+    app.on('web-contents-created', (_event, contents) => {
+      contents.on('will-attach-webview', (wvEvent) => {
+        wvEvent.preventDefault();
+        console.warn('[Security] Blocked webview attachment');
+      });
+
+      contents.setWindowOpenHandler(({ url }) => {
+        if (url.startsWith('app://telegram/')) {
+          return {
+            action: 'allow',
+            overrideBrowserWindowOptions: {
+              webPreferences: {
+                preload: path.join(__dirname, 'preload.cjs'),
+                contextIsolation: true,
+                nodeIntegration: false,
+                sandbox: false,
+                backgroundThrottling: false,
+              },
+            },
+          };
+        }
+        if (isSafeExternalUrl(url)) {
+          shell.openExternal(url);
+        } else {
+          console.warn('[Security] Blocked window.open for unsafe URL:', url);
+        }
+        return { action: 'deny' };
+      });
+
+      contents.on('will-navigate', (navEvent, targetUrl) => {
+        if (!targetUrl.startsWith('app://telegram/')) {
+          navEvent.preventDefault();
+          if (isSafeExternalUrl(targetUrl)) {
+            shell.openExternal(targetUrl);
+          } else {
+            console.warn('[Security] Blocked will-navigate for unsafe URL:', targetUrl);
+          }
+        }
+      });
+
+      contents.on('will-redirect', (redEvent, targetUrl) => {
+        if (!targetUrl.startsWith('app://telegram/')) {
+          redEvent.preventDefault();
+          console.warn('[Security] Blocked will-redirect outside app:', targetUrl);
+        }
+      });
+    });
+
     registerHermesFsHandlers();
     registerAppProtocol();
 

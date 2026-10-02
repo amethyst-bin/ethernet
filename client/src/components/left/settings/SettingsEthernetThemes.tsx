@@ -14,13 +14,12 @@ import Island from '../../gili/layout/Island';
 import Button from '../../ui/Button';
 import ConfirmDialog from '../../ui/ConfirmDialog';
 import Icon from '../../common/icons/Icon';
-import InputText from '../../ui/InputText';
 import ListItem from '../../ui/ListItem';
 import Loading from '../../ui/Loading';
-import Modal from '../../ui/Modal';
 import PromptDialog from '../../modals/prompt/PromptDialog';
-import TextArea from '../../ui/TextArea';
 import DocumentationModal from './DocumentationModal';
+import ThemeCssEditorModal from './ThemeCssEditorModal';
+import { ETH_DEFAULT_COLORS } from './SettingsEthernetThemeEditor';
 
 import styles from './SettingsEthernetThemes.module.scss';
 
@@ -131,13 +130,13 @@ const SettingsEthernetThemes: FC<OwnProps> = ({ isActive, onReset }) => {
     }
   });
 
-  const handleSaveCss = useLastCallback(async () => {
+  const handleSaveCss = useLastCallback(async (nameToSave: string, cssToSave: string) => {
     const api = window.ethernetDesktop || window.hermesDesktop;
     const loader = window.ethernet || window.hermes;
-    if (!api || editingName === undefined) return;
-    const name = editingName.trim().replace(/[^\w\u0400-\u04FF-]+/g, '-').replace(/^-+|-+$/g, '') || 'Тема';
-    await api.themeSave(name, editingCss);
-    const parsedMod = cssToMod(editingCss);
+    if (!api) return;
+    const name = (nameToSave || '').trim().replace(/[^\w\u0400-\u04FF-]+/g, '-').replace(/^-+|-+$/g, '') || 'Тема';
+    await api.themeSave(name, cssToSave);
+    const parsedMod = cssToMod(cssToSave);
     await api.modSet(parsedMod);
     await api.themeActivate(name);
     if (loader?.applyTheme) await loader.applyTheme(name);
@@ -150,32 +149,48 @@ const SettingsEthernetThemes: FC<OwnProps> = ({ isActive, onReset }) => {
     const loader = window.ethernet || window.hermes;
     if (!api) return;
     const rawName = theme.name.replace(/\.css$/, '');
-    await api.themeActivate(rawName);
+    // Optimistic UI update: instantly move checkmark to selected theme
+    setThemes((prev) => prev?.map((t) => ({ ...t, active: t.name === theme.name })));
     try {
+      await api.themeActivate(rawName);
       const css = await api.themeRead(theme.name);
       if (css) {
         const parsedMod = cssToMod(css);
         await api.modSet(parsedMod);
         if (loader?.applyMod) loader.applyMod(parsedMod);
       }
+      if (loader?.applyTheme) await loader.applyTheme(rawName);
     } catch (err) {
       console.error('[ethernet] activate error', err);
+    } finally {
+      await loadThemes();
     }
-    if (loader?.applyTheme) await loader.applyTheme(rawName);
-    await loadThemes();
   });
 
   const handleActivateDefault = useLastCallback(async () => {
     const api = window.ethernetDesktop || window.hermesDesktop;
     const loader = window.ethernet || window.hermes;
     if (!api) return;
-    await api.themeActivate(null);
-    if (loader?.clearTheme) {
-      await loader.clearTheme();
+    // Optimistic UI update: uncheck all custom themes so default is active
+    setThemes((prev) => prev?.map((t) => ({ ...t, active: false })));
+    try {
+      await api.themeActivate(null);
+      if (loader?.clearTheme) {
+        await loader.clearTheme();
+      }
+      const defaultMod = (await api.modGet()) || {};
+      const finalMod = {
+        ...defaultMod,
+        colors: (defaultMod.colors && Object.keys(defaultMod.colors).length > 0)
+          ? defaultMod.colors
+          : { ...ETH_DEFAULT_COLORS },
+      };
+      if (loader?.applyMod) loader.applyMod(finalMod);
+    } catch (err) {
+      console.error('[ethernet] activate default error', err);
+    } finally {
+      await loadThemes();
     }
-    const defaultMod = (await api.modGet()) || {};
-    if (loader?.applyMod) loader.applyMod(defaultMod);
-    await loadThemes();
   });
 
   const handleDelete = useLastCallback(async () => {
@@ -357,32 +372,13 @@ const SettingsEthernetThemes: FC<OwnProps> = ({ isActive, onReset }) => {
       />
 
       {/* Модальное окно редактирования CSS темы */}
-      <Modal
+      <ThemeCssEditorModal
         isOpen={editingName !== undefined}
+        themeName={editingName || ''}
+        initialCss={editingCss}
         onClose={() => setEditingName(undefined)}
-        title={editingName ? `${getEthernetString(lang, 'EthernetEditTheme')}: ${editingName}` : getEthernetString(lang, 'EthernetNewTheme')}
-      >
-        <div className={styles.editor}>
-          <InputText
-            value={editingName || ''}
-            onChange={(e) => setEditingName(e.currentTarget.value.replace(/\.css$/i, ''))}
-            placeholder={getEthernetString(lang, 'EthernetThemeName')}
-          />
-          <TextArea
-            value={editingCss}
-            onChange={(e) => setEditingCss(e.currentTarget.value)}
-            className={styles.cssArea}
-          />
-          <div className={styles.editorButtons}>
-            <Button onClick={() => setEditingName(undefined)} color="translucent">
-              {lang('Cancel')}
-            </Button>
-            <Button onClick={handleSaveCss}>
-              {getEthernetString(lang, 'EthernetActionSave')}
-            </Button>
-          </div>
-        </div>
-      </Modal>
+        onSave={handleSaveCss}
+      />
 
       <ConfirmDialog
         isOpen={Boolean(deletingName)}

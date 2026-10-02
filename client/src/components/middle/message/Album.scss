@@ -5,8 +5,17 @@
 
   aspect-ratio: var(--album-aspect-ratio);
   width: var(--max-width);
+  min-width: min(var(--max-width), 100%);
   max-width: 100%;
   margin: auto;
+
+  .message-content.text & {
+    width: calc(100% + var(--message-media-breakout-left, 0.5rem) + var(--message-media-breakout-right, 0.5rem));
+    min-width: calc(100% + var(--message-media-breakout-left, 0.5rem) + var(--message-media-breakout-right, 0.5rem));
+    max-width: calc(100% + var(--message-media-breakout-left, 0.5rem) + var(--message-media-breakout-right, 0.5rem));
+    margin-left: calc(-1 * var(--message-media-breakout-left, 0.5rem));
+    margin-right: calc(-1 * var(--message-media-breakout-right, 0.5rem));
+  }
 
   .message-content:not(.is-forwarded).media.text & {
     margin-block: -0.3125rem 0.3125rem;

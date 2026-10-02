@@ -8,6 +8,7 @@ import type { TabWithProperties } from './SquareTabList';
 export type { TabWithProperties };
 
 import buildClassName from '../../util/buildClassName';
+import { emojiToFolderIcon } from '../../util/folderIconMap';
 import renderText from '../common/helpers/renderText';
 
 import useFlag from '../../hooks/useFlag';
@@ -127,6 +128,7 @@ const TabList = ({
     const customEmojiId = tab.customEmojiDocumentId
       || (typeof tab.emoticon === 'object' ? tab.emoticon.documentId : undefined);
     const stringEmoticon = typeof tab.emoticon === 'string' ? tab.emoticon : undefined;
+    const folderIconName = stringEmoticon ? emojiToFolderIcon(stringEmoticon) : undefined;
 
     return (
       <div
@@ -140,7 +142,11 @@ const TabList = ({
         onClick={() => handleTabClick(index)}
         onContextMenu={hasContextActions ? (e) => handleContextMenu(index, e) : undefined}
       >
-        {stringEmoticon && <span className={styles.tabEmoji}>{stringEmoticon}</span>}
+        {folderIconName ? (
+          <Icon name={folderIconName} className={styles.tabIcon} />
+        ) : stringEmoticon ? (
+          <span className={styles.tabEmoji}>{stringEmoticon}</span>
+        ) : undefined}
         {customEmojiId && (
           <CustomEmoji
             documentId={customEmojiId}

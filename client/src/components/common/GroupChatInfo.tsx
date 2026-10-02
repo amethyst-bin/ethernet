@@ -16,6 +16,7 @@ import {
 } from '../../global/helpers';
 import {
   selectChat,
+  selectChatLastMessageId,
   selectChatMessages,
   selectChatOnlineCount,
   selectIsChatRestricted,
@@ -295,10 +296,11 @@ export default memo(withGlobal<OwnProps>(
     const targetChatId = isSavedDialog ? global.currentUserId! : chatId;
     const effectiveThreadId = threadId || MAIN_THREAD_ID;
     const viewportIds = selectViewportIds(global, targetChatId, effectiveThreadId);
+    const lastMessageId = selectChatLastMessageId(global, targetChatId);
     const areMessagesLoaded = Boolean(
       selectChatMessages(global, targetChatId)
       || viewportIds !== undefined
-      || (chat && !chat.lastMessageId && !chat.lastMessage)
+      || (chat && !lastMessageId)
       || chat?.isRestricted
       || chat?.isForbidden,
     );

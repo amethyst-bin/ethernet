@@ -30,7 +30,7 @@ const PROXIMITY_RADIUS = 0.35; // Normalized cursor proximity radius
 const SCRAMBLE_TICK_MS = 95; // Deliberate, smooth scramble speed
 
 const EthernetAnimatedLogo: FC<OwnProps> = ({ onClick, className }) => {
-  const containerRef = useRef<HTMLButtonElement | null>(null);
+  const containerRef = useRef<HTMLButtonElement>();
   const [letters, setLetters] = useState<string[]>(() => [...TARGET_LETTERS]);
   const [activeIndices, setActiveIndices] = useState<Set<number>>(() => new Set());
   const [isHovered, setIsHovered] = useState<boolean>(false);
@@ -38,7 +38,7 @@ const EthernetAnimatedLogo: FC<OwnProps> = ({ onClick, className }) => {
   const cursorNormalizedX = useRef<number | null>(null);
   const animLoopRef = useRef<number | undefined>(undefined);
   const lastTickTimeRef = useRef<number>(0);
-  const settleTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
+  const settleTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
 
   // Frame update loop with deliberate throttle for proximity scramble
   const updateScramble = useCallback((timestamp: number) => {

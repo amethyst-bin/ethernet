@@ -116,11 +116,11 @@ const Dialogs = ({ dialogs, currentMessageList }: StateProps) => {
   };
 
   const renderError = (error: ApiDialogError) => {
-    const renderedErrorMessage = error.hasErrorKey
+    const renderedErrorMessage = error?.hasErrorKey
       ? getReadableErrorText(error)
-      : error.entities?.length
-        ? renderTextWithEntities({ text: error.message, entities: error.entities })
-        : error.message;
+      : error?.entities?.length
+        ? renderTextWithEntities({ text: error?.message || '', entities: error.entities })
+        : (error?.message || '');
 
     return renderTextDialog(renderedErrorMessage, getErrorHeader(error));
   };

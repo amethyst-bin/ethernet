@@ -3253,6 +3253,7 @@
 "EthernetSectionAnimations" = "Animations";
 "EthernetBorderRadius" = "Corner radius";
 "EthernetRadiusUi" = "Interface & Panels";
+"EthernetRadiusFoldersSidebar" = "Folders sidebar";
 "EthernetRadiusMessages" = "Message bubbles";
 "EthernetRadiusButtons" = "Buttons & inputs";
 "EthernetRadiusAvatars" = "Avatars (%)";
@@ -3278,6 +3279,7 @@
 "EthernetWidthWide" = "Wide";
 "EthernetWidthFull" = "Full width";
 "EthernetColorLinks" = "Colored text (links, tags)";
+"EthernetColorIconButtons" = "Button icons";
 "EthernetBlurSidebar" = "Sidebar";
 "EthernetBlurHeader" = "Header";
 "EthernetBlurBubbles" = "Message bubbles";

@@ -53,7 +53,7 @@ const SettingsEthernetNetwork: FC<OwnProps> = ({ isActive, onReset }) => {
     onBack: onReset,
   });
 
-  const ethernet = (window as any).ethernetDesktop;
+  const ethernet = (window as any).ethernetDesktop || (window as any).hermesDesktop;
 
   // Custom Proxy State
   const [proxyState, setProxyState] = useState<ProxyState>({
@@ -81,7 +81,7 @@ const SettingsEthernetNetwork: FC<OwnProps> = ({ isActive, onReset }) => {
 
   // Load States
   const loadState = useCallback(async () => {
-    if (!hermes) return;
+    if (!ethernet) return;
     try {
       if (ethernet.proxyGetState) {
         const state = await ethernet.proxyGetState();

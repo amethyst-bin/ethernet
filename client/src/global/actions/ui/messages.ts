@@ -490,6 +490,8 @@ addActionHandler('scrollMessageListToBottom', (global, actions, payload): Action
     noHighlight: true,
   }, tabId);
 
+  global = replaceTabThreadParam(global, chatId, threadId, 'replyStack', undefined, tabId);
+
   setGlobal(global, { forceOnHeavyAnimation: true });
 
   // Reuse part of `focusMessage`

@@ -74,14 +74,14 @@
 
 #LeftColumn {
   --left-column-min-width: 16rem;
-  --left-column-max-width: 26.5rem;
+  --left-column-max-width: 30rem;
   --slide-background-color: transparent;
 
   position: relative;
 
   overflow: hidden;
 
-  width: 33vw;
+  width: var(--left-column-width, 27rem);
   min-width: var(--left-column-min-width);
   max-width: var(--left-column-max-width);
   height: auto;
@@ -93,18 +93,6 @@
   box-shadow: var(--shadow-island);
 
   transition: height var(--layer-transition), max-height var(--layer-transition), transform var(--layer-transition);
-
-  #Main.right-column-shown:has(#RightColumn.is-profile-view) &,
-  #Main.right-column-open:has(#RightColumn.is-profile-view) & {
-    height: calc(50% - 0.75rem) !important;
-    max-height: calc(50% - 0.75rem) !important;
-    align-self: start;
-    margin-bottom: 0.25rem !important;
-    transform: translate3d(0, 0, 0) !important;
-    visibility: visible !important;
-    opacity: 1 !important;
-    display: block !important;
-  }
 
   @media (min-width: 926px) {
     --left-column-max-width: 40vw;
@@ -135,21 +123,6 @@
     width: 26.5rem !important;
     height: calc(var(--vh, 1vh) * 100 - 2rem);
     margin: 0;
-
-    #Main.right-column-shown:has(#RightColumn.is-profile-view) &,
-    #Main.right-column-open:has(#RightColumn.is-profile-view) & {
-      position: fixed !important;
-      top: 0.5rem !important;
-      left: 0.5rem !important;
-      height: calc(50% - 0.75rem) !important;
-      max-height: calc(50% - 0.75rem) !important;
-      width: calc(100vw - 1rem) !important;
-      max-width: calc(100vw - 1rem) !important;
-      transform: translate3d(0, 0, 0) !important;
-      visibility: visible !important;
-      opacity: 1 !important;
-      z-index: 10 !important;
-    }
 
     &::after {
       pointer-events: none;
@@ -225,23 +198,6 @@
 
     box-shadow: none;
 
-    #Main.right-column-shown:has(#RightColumn.is-profile-view) &,
-    #Main.right-column-open:has(#RightColumn.is-profile-view) & {
-      visibility: visible !important;
-      opacity: 1 !important;
-      z-index: 10 !important;
-      top: 0.5rem !important;
-      left: 0.5rem !important;
-      width: calc(100vw - 1rem) !important;
-      max-width: calc(100vw - 1rem) !important;
-      height: calc(50% - 0.75rem) !important;
-      max-height: calc(50% - 0.75rem) !important;
-      border-radius: var(--border-radius-island) !important;
-      box-shadow: var(--shadow-island) !important;
-      transform: translate3d(0, 0, 0) !important;
-      display: block !important;
-    }
-
     // Fix: when opening the SymbolMenu, the chat list flashes in the background
     body.is-symbol-menu-open &::before {
       content: '';
@@ -280,6 +236,7 @@
 }
 
 #MiddleColumn {
+  contain: layout;
 
   #Main.history-animation-disabled & {
     transition: none;

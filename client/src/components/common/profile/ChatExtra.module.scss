@@ -18,10 +18,21 @@
   grid-template-columns: 1fr auto;
   grid-template-rows: auto auto;
   column-gap: 0.5rem;
-
   margin-bottom: 1rem;
+  width: 100%;
+  box-sizing: border-box;
 
   @include mixins.with-vt-type('chatExtra');
+
+  :global(.ListItem),
+  :global(.Chat) {
+    :global(.title),
+    :global(.title h3),
+    :global(h3),
+    :global(.fullName) {
+      font-weight: 400 !important;
+    }
+  }
 }
 
 .personalChannelTitle {
@@ -40,8 +51,38 @@
   @include mixins.with-vt-type('chatExtra');
 }
 
+.infoIsland {
+  width: 100%;
+  box-sizing: border-box;
+
+  :global(.ListItem-button) {
+    padding-inline-end: 0.5rem;
+  }
+
+  :global(.ListItem) {
+    :global(.title),
+    :global(.title h3),
+    :global(h3),
+    :global(.subtitle),
+    :global(.ListItem-button > span:not(.switch)),
+    :global(.word-break) {
+      font-weight: 400 !important;
+    }
+  }
+}
+
+.linkItemTitle {
+  font-weight: 400 !important;
+}
+
+.qrButton {
+  margin-inline-start: auto;
+  margin-inline-end: -0.25rem;
+}
+
 .switch {
   margin-inline-start: auto;
+  margin-inline-end: 0.125rem;
 }
 
 .botVerificationSection,

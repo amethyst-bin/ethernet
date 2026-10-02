@@ -2,7 +2,7 @@ import { memo, useCallback } from '@teact';
 
 import type { ApiSticker } from '../../../../api/types';
 
-import { folderIconMap } from '../../../../util/folderIconMap';
+import { FOLDER_PICKER_ICONS } from '../../../../util/folderIconMap';
 
 import CustomEmojiPicker from '../../../common/CustomEmojiPicker';
 import Icon from '../../../common/icons/Icon';
@@ -33,11 +33,16 @@ const FolderIconPickerMenu = ({
       className="settings-folders-icon-picker-menu SymbolMenu"
     >
       <div className="SymbolMenu-main">
-        <div className="settings-folders-icon-picker-menu-folders">
+        <div className="settings-folders-icon-picker-menu-folders custom-scroll">
           {
-            Object.keys(folderIconMap).map((emoji) => (
-              <div className="EmojiButton" onClick={() => handleEmojiSelect(emoji)}>
-                <Icon name={folderIconMap[emoji]} />
+            FOLDER_PICKER_ICONS.map(({ emoji, icon }) => (
+              <div
+                key={emoji}
+                className="EmojiButton"
+                onClick={() => handleEmojiSelect(emoji)}
+                title={emoji}
+              >
+                <Icon name={icon} />
               </div>
             ))
           }

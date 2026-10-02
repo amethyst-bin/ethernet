@@ -13,6 +13,10 @@
 
   transition: background-color 150ms;
 
+  :global(#RightColumn.is-profile-view) & {
+    background-color: var(--color-background-secondary) !important;
+  }
+
   &.secondary {
     background-color: var(--color-background-secondary);
   }

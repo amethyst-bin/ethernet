@@ -157,11 +157,11 @@ export default function getReadableErrorText(error: ApiError) {
 }
 
 export function getShippingError(error: ApiError): ApiFieldError | undefined {
-  return SHIPPING_ERRORS[error.message];
+  return error?.message ? SHIPPING_ERRORS[error.message] : undefined;
 }
 
 export function shouldClosePaymentModal(error: ApiError): boolean {
-  return FINAL_PAYMENT_ERRORS.has(error.message);
+  return Boolean(error?.message && FINAL_PAYMENT_ERRORS.has(error.message));
 }
 
 export function shouldShowErrorDialog(error: ApiError): boolean {

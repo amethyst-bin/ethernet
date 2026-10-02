@@ -541,10 +541,9 @@ const Main = ({
     waitForTransitionEnd(document.getElementById('RightColumn')!, () => {
       endHeavyAnimation();
       willAnimateRightColumnRef.current = false;
-      forceUpdate();
       setIsNarrowMessageList(isRightColumnOpen);
-    });
-  }, [isMiddleColumnOpen, isRightColumnOpen, noRightColumnAnimation, forceUpdate]);
+    }, undefined, 350);
+  }, [isMiddleColumnOpen, isRightColumnOpen, noRightColumnAnimation]);
 
   const bgClassName = buildClassName(
     !noRightColumnAnimation && backgroundStyles.withTransition,
