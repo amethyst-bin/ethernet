@@ -43,7 +43,7 @@ import * as mediaLoader from './mediaLoader';
 import { oldTranslate } from './oldLangProvider';
 import { debounce } from './schedulers';
 import { getServerTime } from './serverTime';
-import { isAllNotificationsDisabled } from './ghostMode';
+import { isAllNotificationsDisabled, shouldUseNativeNotifications } from './ghostMode';
 
 import MessageSummary from '../components/common/MessageSummary';
 
@@ -398,7 +398,7 @@ export async function notifyAboutCall({
 
   const icon = await getAvatar(user);
 
-  if (window.ethernetDesktop?.showNotification) {
+  if (window.ethernetDesktop?.showNotification && !shouldUseNativeNotifications()) {
     window.ethernetDesktop.showNotification({
       title: oldTranslate('VoipIncoming'),
       body: getUserFullName(user) || '',
@@ -474,7 +474,7 @@ export async function notifyAboutMessage({
     body,
   } = getNotificationContent(chat, message as ApiMessage, activeReaction);
 
-  if (window.ethernetDesktop?.showNotification) {
+  if (window.ethernetDesktop?.showNotification && !shouldUseNativeNotifications()) {
     window.ethernetDesktop.showNotification({
       title,
       body,

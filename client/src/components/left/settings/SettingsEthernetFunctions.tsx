@@ -213,6 +213,24 @@ const SettingsEthernetFunctions: FC<OwnProps> = ({ isActive, onReset }) => {
 
         <div
           className={styles.row}
+          onClick={() => updateSetting('useNativeNotifications', !activeSettings.useNativeNotifications)}
+        >
+          <div className={styles.titleWithSubtitle}>
+            <span className={styles.titleText}>{getEthernetString(lang, 'EthernetNativeNotifications')}</span>
+            <span className={styles.subtitleText}>{getEthernetString(lang, 'EthernetNativeNotificationsDesc')}</span>
+          </div>
+          <div className={styles.switcherWrapper}>
+            <Switcher
+              id="use-native-notifications-switch"
+              label={getEthernetString(lang, 'EthernetNativeNotifications')}
+              checked={Boolean(activeSettings.useNativeNotifications)}
+              onCheck={(checked) => updateSetting('useNativeNotifications', checked)}
+            />
+          </div>
+        </div>
+
+        <div
+          className={styles.row}
           onClick={() => updateSetting('disableCloseToTray', !activeSettings.disableCloseToTray)}
         >
           <span className={styles.titleText}>{getEthernetString(lang, 'EthernetDisableCloseToTray')}</span>

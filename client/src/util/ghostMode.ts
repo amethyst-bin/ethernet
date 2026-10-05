@@ -15,6 +15,7 @@ export type GhostSettings = {
   saveInBotDialogs: boolean;
   disableAds: boolean;
   disableAllNotifications: boolean;
+  useNativeNotifications: boolean;
   disableCloseToTray: boolean;
   disableNftGifts: boolean;
 };
@@ -34,6 +35,7 @@ export const DEFAULT_GHOST_SETTINGS: GhostSettings = {
   saveInBotDialogs: false,
   disableAds: true,
   disableAllNotifications: false,
+  useNativeNotifications: false,
   disableCloseToTray: false,
   disableNftGifts: false,
 };
@@ -200,6 +202,7 @@ export function getEffectiveGhostSettings(userId?: string): GhostSettings {
     saveInBotDialogs: base.saveInBotDialogs !== undefined ? Boolean(base.saveInBotDialogs) : DEFAULT_GHOST_SETTINGS.saveInBotDialogs,
     disableAds: base.disableAds !== undefined ? Boolean(base.disableAds) : DEFAULT_GHOST_SETTINGS.disableAds,
     disableAllNotifications: base.disableAllNotifications !== undefined ? Boolean(base.disableAllNotifications) : DEFAULT_GHOST_SETTINGS.disableAllNotifications,
+    useNativeNotifications: Boolean(base.useNativeNotifications),
     disableCloseToTray: base.disableCloseToTray !== undefined ? Boolean(base.disableCloseToTray) : DEFAULT_GHOST_SETTINGS.disableCloseToTray,
     disableNftGifts: base.disableNftGifts !== undefined ? Boolean(base.disableNftGifts) : DEFAULT_GHOST_SETTINGS.disableNftGifts,
   };
@@ -226,6 +229,11 @@ export function isAllNotificationsDisabled(userId?: string): boolean {
 export function isCloseToTrayDisabled(): boolean {
   const storage = (typeof window !== 'undefined' && (window as any).__ethernetGhostStorage) || currentStorage;
   return Boolean(storage.global?.disableCloseToTray);
+}
+
+export function shouldUseNativeNotifications(): boolean {
+  const storage = (typeof window !== 'undefined' && (window as any).__ethernetGhostStorage) || currentStorage;
+  return Boolean(storage.global?.useNativeNotifications);
 }
 
 export function isGhostActionBlocked(

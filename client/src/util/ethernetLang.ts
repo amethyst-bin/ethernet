@@ -103,6 +103,11 @@ const DICTIONARY: Record<string, { ru: string; en: string }> = {
 
   EthernetDisableAllNotifications: { ru: 'Выключить уведомления', en: 'Disable notifications' },
   EthernetDisableAllNotificationsDesc: { ru: 'Полностью отключает все всплывающие окна, звуки и уведомления о сообщениях и звонках', en: 'Completely disables all popups, sounds and notifications for messages and calls' },
+  EthernetNativeNotifications: { ru: 'Системные уведомления', en: 'Native notifications' },
+  EthernetNativeNotificationsDesc: {
+    ru: 'Показывать уведомления средствами системы вместо стиля мода. Помогает при лагах на некоторых WM Linux',
+    en: 'Use OS notifications instead of the mod style. Helps when mod notifications lag on some Linux WMs',
+  },
   EthernetDisableCloseToTray: { ru: 'Не сворачивать в трей', en: 'Do not minimize to tray' },
   EthernetDisableCloseToTrayDesc: { ru: 'При нажатии на крестик окно приложения будет полностью закрываться, а не сворачиваться в системный трей', en: 'Clicking the close button (X) will completely quit the application instead of minimizing to tray' },
 
